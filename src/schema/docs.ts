@@ -1,8 +1,16 @@
-import type { SchemaDefinition } from './define.js';
+import type { EntityDefinition, SchemaDefinition } from './define.js';
 
 export interface DocGeneratorOptions {
   /** Which tables to generate. */
   tables: ('statuses' | 'transitions' | 'manual-transitions')[];
+}
+
+/** Format a condition as `fn(key=value, ...)`. */
+function formatCondition(c: { fn: string; args: Record<string, unknown> }): string {
+  const argsStr = Object.entries(c.args)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(', ');
+  return `${c.fn}(${argsStr})`;
 }
 
 /**
@@ -35,14 +43,7 @@ export function generateDocs(
         lines.push('| From | To | Conditions |');
         lines.push('|------|----|------------|');
         for (const t of entity.transitions) {
-          const conds = (t.conditions ?? [])
-            .map((c) => {
-              const argsStr = Object.entries(c.args)
-                .map(([k, v]) => `${k}=${v}`)
-                .join(', ');
-              return `${c.fn}(${argsStr})`;
-            })
-            .join(', ');
+          const conds = (t.conditions ?? []).map(formatCondition).join(', ');
           lines.push(`| ${t.from} | ${t.to} | ${conds || '—'} |`);
         }
         lines.push('');
@@ -96,4 +97,47 @@ export function updateDocContent(
   }
 
   return { content: result, updated: tablesReplaced.length > 0, tablesReplaced };
+}
+
+/**
+ * Generate a Mermaid stateDiagram-v2 string from an entity definition.
+ *
+ * - First status in the tuple is treated as the initial state.
+ * - Auto transitions are labeled with their conditions.
+ * - Manual transitions are labeled "manual". ANY wildcards are expanded
+ *   to all statuses (excluding the target to avoid trivial self-loops).
+ */
+export function generateMermaid(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  entity: EntityDefinition<readonly string[], readonly string[], any>,
+): string {
+  const lines: string[] = ['stateDiagram-v2'];
+
+  // Initial state → first status
+  lines.push(`    [*] --> ${entity.statuses[0]}`);
+
+  // Auto transitions
+  if (entity.transitions) {
+    for (const t of entity.transitions) {
+      const label = (t.conditions ?? []).map(formatCondition).join(' AND ');
+      lines.push(`    ${t.from} --> ${t.to}${label ? `: ${label}` : ''}`);
+    }
+  }
+
+  // Manual transitions (expand ANY wildcard)
+  if (entity.manualTransitions) {
+    for (const mt of entity.manualTransitions) {
+      if (mt.from === 'ANY') {
+        for (const status of entity.statuses) {
+          if (status !== mt.to) {
+            lines.push(`    ${status} --> ${mt.to}: manual`);
+          }
+        }
+      } else {
+        lines.push(`    ${mt.from} --> ${mt.to}: manual`);
+      }
+    }
+  }
+
+  return lines.join('\n');
 }

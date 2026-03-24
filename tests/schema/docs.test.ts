@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateDocs, updateDocContent } from '../../src/schema/docs.js';
+import { generateDocs, generateMermaid, updateDocContent } from '../../src/schema/docs.js';
 import { createDefiner, defineSchema } from '../../src/schema/define.js';
 import type { BuiltinPresetArgsMap } from '../../src/presets/builtins.js';
 
@@ -138,6 +138,123 @@ Footer`;
     expect(result.content).toContain('Footer');
     expect(result.content).toContain('| PROPOSED |');
     expect(result.content).not.toContain('\nold\n');
+  });
+});
+
+describe('generateMermaid', () => {
+  it('generates stateDiagram-v2 with initial state and auto transitions', () => {
+    const entity = define.entity({
+      name: 'Hypothesis',
+      statuses: ['PROPOSED', 'TESTING', 'VALIDATED'] as const,
+      transitions: [
+        {
+          from: 'PROPOSED',
+          to: 'TESTING',
+          conditions: [{ fn: 'field_present', args: { name: 'assignee' } }],
+        },
+        {
+          from: 'TESTING',
+          to: 'VALIDATED',
+          conditions: [{ fn: 'field_equals', args: { name: 'result', value: 'pass' } }],
+        },
+      ],
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toContain('stateDiagram-v2');
+    expect(result).toContain('[*] --> PROPOSED');
+    expect(result).toContain('PROPOSED --> TESTING: field_present(name=assignee)');
+    expect(result).toContain('TESTING --> VALIDATED: field_equals(name=result, value=pass)');
+  });
+
+  it('expands ANY wildcard to all statuses except the target', () => {
+    const entity = define.entity({
+      name: 'Task',
+      statuses: ['OPEN', 'IN_PROGRESS', 'DEFERRED'] as const,
+      manualTransitions: [{ from: 'ANY', to: 'DEFERRED' }],
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toContain('OPEN --> DEFERRED: manual');
+    expect(result).toContain('IN_PROGRESS --> DEFERRED: manual');
+    // No self-loop DEFERRED → DEFERRED
+    expect(result).not.toContain('DEFERRED --> DEFERRED');
+  });
+
+  it('shows specific manual transitions without expansion', () => {
+    const entity = define.entity({
+      name: 'Item',
+      statuses: ['A', 'B', 'C'] as const,
+      manualTransitions: [{ from: 'A', to: 'C' }],
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toContain('A --> C: manual');
+    // Only A→C, not B→C
+    expect(result).not.toContain('B --> C');
+  });
+
+  it('handles entity with no transitions', () => {
+    const entity = define.entity({
+      name: 'Simple',
+      statuses: ['ONLY'] as const,
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toBe('stateDiagram-v2\n    [*] --> ONLY');
+  });
+
+  it('joins multiple conditions with AND', () => {
+    const entity = define.entity({
+      name: 'Multi',
+      statuses: ['A', 'B'] as const,
+      transitions: [
+        {
+          from: 'A',
+          to: 'B',
+          conditions: [
+            { fn: 'field_present', args: { name: 'x' } },
+            { fn: 'field_equals', args: { name: 'y', value: 'z' } },
+          ],
+        },
+      ],
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toContain('A --> B: field_present(name=x) AND field_equals(name=y, value=z)');
+  });
+
+  it('renders unlabeled transition when conditions are empty', () => {
+    const entity = define.entity({
+      name: 'Auto',
+      statuses: ['A', 'B'] as const,
+      transitions: [{ from: 'A', to: 'B' }],
+    });
+
+    const result = generateMermaid(entity);
+
+    expect(result).toContain('A --> B');
+    // No trailing colon
+    expect(result).not.toContain('A --> B:');
+  });
+
+  it('includes both auto and manual transitions', () => {
+    const schema = makeSchema();
+    const entity = schema.entities.hypothesis;
+    const result = generateMermaid(entity);
+
+    // Auto
+    expect(result).toContain('PROPOSED --> TESTING: field_present(name=assignee)');
+    // Manual (ANY → REJECTED expands to 3 edges, excluding REJECTED itself)
+    expect(result).toContain('PROPOSED --> REJECTED: manual');
+    expect(result).toContain('TESTING --> REJECTED: manual');
+    expect(result).toContain('VALIDATED --> REJECTED: manual');
+    expect(result).not.toContain('REJECTED --> REJECTED');
   });
 });
 

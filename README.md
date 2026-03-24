@@ -203,6 +203,28 @@ const { content, updated } = updateDocContent(markdown, schema);
 // Replaces the region between markers with fresh tables
 ```
 
+### 5. Generate state diagrams
+
+```typescript
+import { generateMermaid } from '@beomjk/state-engine/schema';
+
+console.log(generateMermaid(hypothesis));
+```
+
+Output (renders natively on GitHub):
+
+```mermaid
+stateDiagram-v2
+    [*] --> PROPOSED
+    PROPOSED --> TESTING: field_present(name=kill_criteria)
+    TESTING --> SUPPORTED: field_equals(name=result, value=pass)
+    TESTING --> REFUTED: field_equals(name=result, value=fail)
+    PROPOSED --> DEFERRED: manual
+    TESTING --> DEFERRED: manual
+    SUPPORTED --> DEFERRED: manual
+    REFUTED --> DEFERRED: manual
+```
+
 ## API Overview
 
 ### Entry Points
@@ -246,6 +268,7 @@ const manual = extractManualTransitions(entity); // → ManualTransition[]
 // Docs
 const docs = generateDocs(schema, { tables: ['statuses', 'transitions'] });
 const { content, updated } = updateDocContent(markdown, schema);
+const mermaid = generateMermaid(entity);  // → Mermaid stateDiagram-v2 string
 ```
 
 ### Built-in Presets

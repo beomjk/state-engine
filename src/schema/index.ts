@@ -12,5 +12,5 @@ export type {
   PresetArgsMap,
   SchemaDefinition,
 } from './define.js';
-export { generateDocs, updateDocContent } from './docs.js';
+export { generateDocs, generateMermaid, updateDocContent } from './docs.js';
 export type { DocGeneratorOptions } from './docs.js';

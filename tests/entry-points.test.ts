@@ -9,6 +9,7 @@ import {
   extractRules,
   extractManualTransitions,
   generateDocs,
+  generateMermaid,
   updateDocContent,
   builtinPresets,
   UnknownPresetError,
@@ -44,6 +45,7 @@ describe('entry point imports', () => {
     expect(extractRules).toBeTypeOf('function');
     expect(extractManualTransitions).toBeTypeOf('function');
     expect(generateDocs).toBeTypeOf('function');
+    expect(generateMermaid).toBeTypeOf('function');
     expect(updateDocContent).toBeTypeOf('function');
     expect(builtinPresets).toBeTypeOf('object');
     expect(UnknownPresetError).toBeTypeOf('function');
