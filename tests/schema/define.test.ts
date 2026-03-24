@@ -75,6 +75,18 @@ describe('createDefiner / defineSchema', () => {
     ]);
   });
 
+  it('extractRules defaults missing conditions to empty array', () => {
+    const def = define.entity({
+      name: 'Test',
+      statuses: ['A', 'B'] as const,
+      transitions: [{ from: 'A', to: 'B' }],
+    });
+
+    const rules = extractRules(def);
+
+    expect(rules).toEqual([{ from: 'A', to: 'B', conditions: [] }]);
+  });
+
   it('extractRules returns empty array when no transitions', () => {
     const def = define.entity({
       name: 'Test',

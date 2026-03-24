@@ -97,7 +97,12 @@ export interface Engine<TContext> {
   /** Evaluate a single rule. All conditions must be met. */
   evaluate(entity: Entity, context: TContext, rule: TransitionRule): EvaluationResult;
 
-  /** Return all reachable target statuses via automatic transitions (FR-017). */
+  /**
+   * Return all reachable target statuses via automatic transitions (FR-017).
+   * Manual transitions are excluded by design (DD-1): they have no conditions
+   * to evaluate, so consumers should union these results with their manual
+   * transitions filtered by current status or 'ANY'.
+   */
   getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): ValidTransition[];
 
   /** Validate whether a specific transition is allowed (auto then manual fallback). */
