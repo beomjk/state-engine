@@ -13,35 +13,22 @@ import {
   UnknownPresetError,
 } from '../src/index.js';
 import type {
-  Engine,
   Entity,
   EvaluationResult,
   ValidTransition,
   ValidationResult,
   TransitionRule,
-  ManualTransition,
-  PresetFn,
-  PresetResult,
-  EntityDefinition,
-  PresetArgsMap,
-  SchemaDefinition,
-  DocGeneratorOptions,
-  BuiltinPresetArgsMap,
   FieldPresentArgs,
-  FieldEqualsArgs,
 } from '../src/index.js';
 
 // Entry point: @beomjk/state-engine/engine
 import { createEngine as createEngine2 } from '../src/engine/index.js';
-import type { Engine as Engine2, ValidTransition as VT2 } from '../src/engine/index.js';
 
 // Entry point: @beomjk/state-engine/schema
 import { defineEntity as de2, extractRules as er2 } from '../src/schema/index.js';
-import type { PresetArgsMap as PAM2 } from '../src/schema/index.js';
 
 // Entry point: @beomjk/state-engine/presets
 import { builtinPresets as bp2 } from '../src/presets/index.js';
-import type { BuiltinPresetArgsMap as BAM2, FieldPresentArgs as FPA2 } from '../src/presets/index.js';
 
 describe('entry point imports', () => {
   it('root entry exports all public API', () => {
@@ -72,7 +59,6 @@ describe('entry point imports', () => {
   });
 
   it('type inference works with full workflow', () => {
-    // This test verifies types resolve correctly at runtime
     const engine = createEngine({ presets: builtinPresets });
     const entity: Entity = { id: '1', type: 'h', status: 'A', meta: { x: 1 } };
     const rule: TransitionRule = { from: 'A', to: 'B', conditions: [] };
@@ -103,7 +89,6 @@ describe('entry point imports', () => {
       ],
     });
 
-    // Verify extractRules produces valid TransitionRule[]
     const rules = extractRules(def);
     expect(rules[0].from).toBe('X');
     expect(rules[0].conditions[0].fn).toBe('field_present');
