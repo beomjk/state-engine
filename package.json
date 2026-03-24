@@ -1,6 +1,6 @@
 {
   "name": "@beomjk/state-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript-first declarative state machine with type-safe schema definitions and spec doc generation",
   "type": "module",
   "exports": {
