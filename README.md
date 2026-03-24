@@ -38,6 +38,8 @@ npm install @beomjk/state-engine
 
 Requires TypeScript 5.0+ and Node 20+. Zero runtime dependencies.
 
+> **Note:** `Entity` requires `status: string`. If your domain objects have optional status (e.g., newly created nodes), narrow the type before passing to the engine — entities without a status are not valid state machine participants.
+
 ## Quick Start
 
 ### 1. Define an entity lifecycle
@@ -106,9 +108,12 @@ const entity = {
   meta: { kill_criteria: 'Disproved if error rate > 5%' },
 };
 
-// What can this entity transition to?
-const targets = engine.getValidTransitions(entity, {}, rules);
-// → [{ status: 'TESTING', rule: ..., matchedIds: [] }]
+// What can this entity transition to? (auto + manual)
+const targets = engine.getValidTransitions(entity, {}, rules, manual);
+// → [
+//   { status: 'TESTING', rule: { from: 'PROPOSED', to: 'TESTING', ... }, matchedIds: [] },
+//   { status: 'DEFERRED', rule: null, matchedIds: [] },
+// ]
 
 // Is a specific transition allowed?
 const result = engine.validate(entity, {}, rules, 'TESTING', manual);
@@ -217,8 +222,8 @@ const engine = createEngine<TContext>(options);
 engine.evaluate(entity, context, rule);
 // → { met: boolean, matchedIds: string[] }
 
-engine.getValidTransitions(entity, context, rules);
-// → ValidTransition[]  (auto rules only; union with manual transitions yourself)
+engine.getValidTransitions(entity, context, rules, manualTransitions?);
+// → ValidTransition[]  (auto rules + manual transitions with rule: null)
 
 engine.validate(entity, context, rules, targetStatus, manualTransitions?);
 // → { valid: true, rule, matchedIds } | { valid: false, reason, matchedIds }
@@ -245,12 +250,16 @@ const { content, updated } = updateDocContent(markdown, schema);
 
 ### Built-in Presets
 
-| Preset          | Args               | Behavior                                           |
-| --------------- | ------------------ | -------------------------------------------------- |
-| `field_present` | `{ name: string }` | Passes if `meta[name]` is non-null and non-empty   |
-| `field_equals`  | `{ name, value }`  | Passes if `meta[name] === value` (strict equality) |
+| Preset          | Args               | Behavior                                                                  |
+| --------------- | ------------------ | ------------------------------------------------------------------------- |
+| `field_present` | `{ name: string }` | Passes if `meta[name]` is non-null, non-empty string, and non-empty array |
+| `field_equals`  | `{ name, value }`  | Passes if `meta[name] === value` (strict equality — `"5" !== 5`)          |
 
-Write your own presets to encode domain logic. A preset is just a function:
+`field_present` treats `null`, `undefined`, `""`, and `[]` as absent. Note that `0`, `false`, and non-empty arrays are considered present.
+
+### Writing Custom Presets
+
+A preset is a function that receives the entity, your injected context, and typed arguments:
 
 ```typescript
 const my_preset: PresetFn<MyContext, MyArgs> = (entity, context, args) => ({
@@ -259,12 +268,34 @@ const my_preset: PresetFn<MyContext, MyArgs> = (entity, context, args) => ({
 });
 ```
 
+`Entity` is a minimal interface (`id`, `type`, `status`, `meta`). If your domain objects carry additional fields (e.g., `links`, `tags`), retrieve them from the context:
+
+```typescript
+// Entity doesn't have links — look up the full domain object from context
+const has_linked: PresetFn<Graph, { type: string }> = (entity, graph, args) => {
+  const node = graph.nodes.get(entity.id);
+  if (!node) return { met: false, matchedIds: [] };
+  const linked = node.links.filter((l) => l.type === args.type);
+  return { met: linked.length > 0, matchedIds: linked.map((l) => l.target) };
+};
+```
+
 ## Design Decisions
 
 - **AND-only conditions** — all conditions in a rule must pass. If you need OR, model it as separate rules with the same `from → to`.
 - **Three-layer validation** — `validate()` checks auto rules first, falls back to manual transitions, then returns an error. This matches the pattern where most transitions are condition-driven but some are user-initiated overrides.
-- **`getValidTransitions` excludes manual transitions** — manual transitions have no conditions to evaluate. Consumers should union the results with their own filtered manual transitions if needed.
 - **`matchedIds` in every result** — designed for graph contexts where you need to know which related entities contributed to a transition decision.
+
+## Error Handling
+
+The engine returns result objects instead of throwing — except for one case:
+
+- **`UnknownPresetError`** — thrown when a condition references a preset name not registered in `createEngine({ presets })`. The error message includes the unknown name and all registered preset names:
+  ```
+  Unknown preset function: "has_linkd". Registered presets: field_present, field_equals
+  ```
+
+All other failures are expressed through return values (`{ met: false }`, `{ valid: false, reason }`).
 
 ## License
 

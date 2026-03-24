@@ -69,7 +69,8 @@ export interface EvaluationResult {
  */
 export interface ValidTransition {
   status: string;
-  rule: TransitionRule;
+  /** Matched auto rule, or null for manual transitions. */
+  rule: TransitionRule | null;
   matchedIds: string[];
 }
 
@@ -97,10 +98,11 @@ export interface Engine<TContext> {
   evaluate(entity: Entity, context: TContext, rule: TransitionRule): EvaluationResult;
 
   /**
-   * Return all reachable target statuses via automatic transitions (FR-017).
-   * Manual transitions are excluded by design (DD-1): they have no conditions
-   * to evaluate, so consumers should union these results with their manual
-   * transitions filtered by current status or 'ANY'.
+   * Return all reachable target statuses (FR-017).
+   *
+   * Auto rules are evaluated first. If `manualTransitions` is provided,
+   * matching manual transitions (by current status or 'ANY' wildcard)
+   * are appended with `rule: null` and `matchedIds: []`.
    *
    * Note: if multiple rules share the same `to` status with different conditions,
    * each passing rule produces a separate entry. Map to `status` and deduplicate
@@ -110,6 +112,7 @@ export interface Engine<TContext> {
     entity: Entity,
     context: TContext,
     rules: TransitionRule[],
+    manualTransitions?: ManualTransition[],
   ): ValidTransition[];
 
   /** Validate whether a specific transition is allowed (auto then manual fallback). */

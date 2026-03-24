@@ -39,6 +39,7 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
     entity: Entity,
     context: TContext,
     rules: TransitionRule[],
+    manualTransitions?: ManualTransition[],
   ): ValidTransition[] {
     const targets: ValidTransition[] = [];
 
@@ -47,6 +48,14 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
       const result = evaluate(entity, context, rule);
       if (result.met) {
         targets.push({ status: rule.to, rule, matchedIds: result.matchedIds });
+      }
+    }
+
+    if (manualTransitions) {
+      for (const mt of manualTransitions) {
+        if (mt.from === 'ANY' || mt.from === entity.status) {
+          targets.push({ status: mt.to, rule: null, matchedIds: [] });
+        }
       }
     }
 
