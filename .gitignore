@@ -4,3 +4,4 @@ coverage/
 *.tsbuildinfo
 *.cast
 .npmrc
+package-lock.json
