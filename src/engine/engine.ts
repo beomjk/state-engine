@@ -5,6 +5,7 @@ import type {
   EvaluationResult,
   ManualTransition,
   TransitionRule,
+  ValidTransition,
   ValidationResult,
 } from './types.js';
 import { UnknownPresetError } from './types.js';
@@ -41,14 +42,14 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
     entity: Entity,
     context: TContext,
     rules: TransitionRule[],
-  ): string[] {
-    const targets: string[] = [];
+  ): ValidTransition[] {
+    const targets: ValidTransition[] = [];
 
     for (const rule of rules) {
       if (rule.from !== entity.status) continue;
       const result = evaluate(entity, context, rule);
       if (result.met) {
-        targets.push(rule.to);
+        targets.push({ status: rule.to, rule, matchedIds: result.matchedIds });
       }
     }
 
@@ -67,7 +68,7 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
       if (rule.from !== entity.status || rule.to !== targetStatus) continue;
       const result = evaluate(entity, context, rule);
       if (result.met) {
-        return { valid: true, matchedIds: result.matchedIds };
+        return { valid: true, rule, matchedIds: result.matchedIds };
       }
     }
 
@@ -76,7 +77,7 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
       for (const mt of manualTransitions) {
         if (mt.to !== targetStatus) continue;
         if (mt.from === 'ANY' || mt.from === entity.status) {
-          return { valid: true, matchedIds: [] };
+          return { valid: true, rule: null, matchedIds: [] };
         }
       }
     }

@@ -66,13 +66,29 @@ export interface EvaluationResult {
 }
 
 /**
- * Result of engine.validate().
+ * Returned by getValidTransitions() (FR-017).
  */
-export interface ValidationResult {
-  valid: boolean;
-  reason?: string;
+export interface ValidTransition {
+  status: string;
+  rule: TransitionRule;
   matchedIds: string[];
 }
+
+/**
+ * Result of engine.validate(). Discriminated union on `valid` field (FR-019).
+ */
+export type ValidationResult =
+  | {
+      valid: true;
+      /** Matched auto rule, or null for manual transitions */
+      rule: TransitionRule | null;
+      matchedIds: string[];
+    }
+  | {
+      valid: false;
+      reason: string;
+      matchedIds: string[];
+    };
 
 /**
  * Engine interface for evaluating state transitions.
@@ -81,8 +97,8 @@ export interface Engine<TContext> {
   /** Evaluate a single rule. All conditions must be met. */
   evaluate(entity: Entity, context: TContext, rule: TransitionRule): EvaluationResult;
 
-  /** Return all reachable target statuses via automatic transitions. */
-  getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): string[];
+  /** Return all reachable target statuses via automatic transitions (FR-017). */
+  getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): ValidTransition[];
 
   /** Validate whether a specific transition is allowed (auto then manual fallback). */
   validate(
@@ -116,17 +132,3 @@ export class UnknownPresetError extends Error {
   }
 }
 
-/**
- * Thrown when an invalid transition is attempted.
- */
-export class InvalidTransitionError extends Error {
-  constructor(
-    public readonly entityId: string,
-    public readonly from: string,
-    public readonly to: string,
-    public readonly reason: string,
-  ) {
-    super(`Invalid transition for ${entityId}: ${from} → ${to}. ${reason}`);
-    this.name = 'InvalidTransitionError';
-  }
-}

@@ -10,9 +10,10 @@ export type {
   PresetResult,
   TransitionCondition,
   TransitionRule,
+  ValidTransition,
   ValidationResult,
 } from './engine/index.js';
-export { InvalidTransitionError, UnknownPresetError } from './engine/index.js';
+export { UnknownPresetError } from './engine/index.js';
 
 // Schema
 export {
@@ -27,3 +28,4 @@ export type { DocGeneratorOptions } from './schema/index.js';
 
 // Presets
 export { builtinPresets } from './presets/index.js';
+export type { BuiltinPresetArgsMap, FieldEqualsArgs, FieldPresentArgs } from './presets/index.js';

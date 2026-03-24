@@ -9,6 +9,7 @@ export type {
   PresetResult,
   TransitionCondition,
   TransitionRule,
+  ValidTransition,
   ValidationResult,
 } from './types.js';
-export { InvalidTransitionError, UnknownPresetError } from './types.js';
+export { UnknownPresetError } from './types.js';
