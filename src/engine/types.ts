@@ -23,11 +23,10 @@ export interface PresetResult {
  * TContext is injected by the consumer (e.g., Graph, DB connection).
  * TArgs allows type-safe arguments per preset.
  */
-export type PresetFn<TContext = unknown, TArgs extends Record<string, unknown> = Record<string, unknown>> = (
-  entity: Entity,
-  context: TContext,
-  args: TArgs,
-) => PresetResult;
+export type PresetFn<
+  TContext = unknown,
+  TArgs extends Record<string, unknown> = Record<string, unknown>,
+> = (entity: Entity, context: TContext, args: TArgs) => PresetResult;
 
 /**
  * A condition within a transition rule.
@@ -66,13 +65,29 @@ export interface EvaluationResult {
 }
 
 /**
- * Result of engine.validate().
+ * Returned by getValidTransitions() (FR-017).
  */
-export interface ValidationResult {
-  valid: boolean;
-  reason?: string;
+export interface ValidTransition {
+  status: string;
+  rule: TransitionRule;
   matchedIds: string[];
 }
+
+/**
+ * Result of engine.validate(). Discriminated union on `valid` field (FR-019).
+ */
+export type ValidationResult =
+  | {
+      valid: true;
+      /** Matched auto rule, or null for manual transitions */
+      rule: TransitionRule | null;
+      matchedIds: string[];
+    }
+  | {
+      valid: false;
+      reason: string;
+      matchedIds: string[];
+    };
 
 /**
  * Engine interface for evaluating state transitions.
@@ -81,8 +96,21 @@ export interface Engine<TContext> {
   /** Evaluate a single rule. All conditions must be met. */
   evaluate(entity: Entity, context: TContext, rule: TransitionRule): EvaluationResult;
 
-  /** Return all reachable target statuses via automatic transitions. */
-  getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): string[];
+  /**
+   * Return all reachable target statuses via automatic transitions (FR-017).
+   * Manual transitions are excluded by design (DD-1): they have no conditions
+   * to evaluate, so consumers should union these results with their manual
+   * transitions filtered by current status or 'ANY'.
+   *
+   * Note: if multiple rules share the same `to` status with different conditions,
+   * each passing rule produces a separate entry. Map to `status` and deduplicate
+   * if you only need unique target statuses.
+   */
+  getValidTransitions(
+    entity: Entity,
+    context: TContext,
+    rules: TransitionRule[],
+  ): ValidTransition[];
 
   /** Validate whether a specific transition is allowed (auto then manual fallback). */
   validate(
@@ -98,6 +126,7 @@ export interface Engine<TContext> {
  * Options for createEngine().
  */
 export interface EngineOptions<TContext> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- type erasure for heterogeneous preset args
   presets: Record<string, PresetFn<TContext, any>>;
 }
 
@@ -113,20 +142,5 @@ export class UnknownPresetError extends Error {
       `Unknown preset function: "${presetName}". Registered presets: ${registeredNames.join(', ')}`,
     );
     this.name = 'UnknownPresetError';
-  }
-}
-
-/**
- * Thrown when an invalid transition is attempted.
- */
-export class InvalidTransitionError extends Error {
-  constructor(
-    public readonly entityId: string,
-    public readonly from: string,
-    public readonly to: string,
-    public readonly reason: string,
-  ) {
-    super(`Invalid transition for ${entityId}: ${from} → ${to}. ${reason}`);
-    this.name = 'InvalidTransitionError';
   }
 }
