@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { createDefiner, defineEntity, defineSchema, extractRules, extractManualTransitions } from '../../src/schema/define.js';
+import {
+  createDefiner,
+  defineEntity,
+  defineSchema,
+  extractRules,
+  extractManualTransitions,
+} from '../../src/schema/define.js';
 import type { BuiltinPresetArgsMap } from '../../src/presets/builtins.js';
 
-const define = createDefiner(['field_present', 'field_equals'] as const)
-  .withArgs<BuiltinPresetArgsMap>();
+const define = createDefiner([
+  'field_present',
+  'field_equals',
+] as const).withArgs<BuiltinPresetArgsMap>();
 
 describe('createDefiner / defineSchema', () => {
   it('define.entity returns definition unchanged', () => {
@@ -125,7 +133,10 @@ describe('createDefiner / defineSchema', () => {
 
   it('legacy defineEntity still works (deprecated)', () => {
     const presetNames = ['field_present', 'field_equals'] as const;
-    const argsMap = { field_present: { name: '' }, field_equals: { name: '', value: undefined as unknown } };
+    const argsMap = {
+      field_present: { name: '' },
+      field_equals: { name: '', value: undefined as unknown },
+    };
     const def = defineEntity(presetNames, argsMap, {
       name: 'Legacy',
       statuses: ['A'] as const,
@@ -180,8 +191,9 @@ describe('type-level safety', () => {
   });
 
   it('defineSchema enforces shared preset names across entities', () => {
-    const narrowDefine = createDefiner(['field_present'] as const)
-      .withArgs<{ field_present: { name: string } }>();
+    const narrowDefine = createDefiner(['field_present'] as const).withArgs<{
+      field_present: { name: string };
+    }>();
 
     const entity = narrowDefine.entity({
       name: 'Test',

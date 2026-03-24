@@ -51,7 +51,9 @@ describe('generateDocs', () => {
     expect(docs.transitions).toContain('**Hypothesis**');
     expect(docs.transitions).toContain('| From | To | Conditions |');
     expect(docs.transitions).toContain('| PROPOSED | TESTING | field_present(name=assignee) |');
-    expect(docs.transitions).toContain('| TESTING | VALIDATED | field_equals(name=result, value=pass) |');
+    expect(docs.transitions).toContain(
+      '| TESTING | VALIDATED | field_equals(name=result, value=pass) |',
+    );
   });
 
   it('generates manual-transitions table', () => {
@@ -149,10 +151,26 @@ describe('scale test (SC-003)', () => {
         name: `Entity${i}`,
         statuses,
         transitions: [
-          { from: 'S1', to: 'S2', conditions: [{ fn: 'field_present', args: { name: `f${i}_a` } }] },
-          { from: 'S2', to: 'S3', conditions: [{ fn: 'field_equals', args: { name: `f${i}_b`, value: 'yes' } }] },
-          { from: 'S3', to: 'S4', conditions: [{ fn: 'field_present', args: { name: `f${i}_c` } }] },
-          { from: 'S4', to: 'S5', conditions: [{ fn: 'field_equals', args: { name: `f${i}_d`, value: 'done' } }] },
+          {
+            from: 'S1',
+            to: 'S2',
+            conditions: [{ fn: 'field_present', args: { name: `f${i}_a` } }],
+          },
+          {
+            from: 'S2',
+            to: 'S3',
+            conditions: [{ fn: 'field_equals', args: { name: `f${i}_b`, value: 'yes' } }],
+          },
+          {
+            from: 'S3',
+            to: 'S4',
+            conditions: [{ fn: 'field_present', args: { name: `f${i}_c` } }],
+          },
+          {
+            from: 'S4',
+            to: 'S5',
+            conditions: [{ fn: 'field_equals', args: { name: `f${i}_d`, value: 'done' } }],
+          },
         ],
         manualTransitions: [{ from: 'ANY', to: 'S1' }],
       });

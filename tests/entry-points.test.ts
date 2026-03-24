@@ -26,7 +26,11 @@ import type {
 import { createEngine as createEngine2 } from '../src/engine/index.js';
 
 // Entry point: @beomjk/state-engine/schema
-import { createDefiner as cd2, defineEntity as de2, extractRules as er2 } from '../src/schema/index.js';
+import {
+  createDefiner as cd2,
+  defineEntity as de2,
+  extractRules as er2,
+} from '../src/schema/index.js';
 
 // Entry point: @beomjk/state-engine/presets
 import { builtinPresets as bp2 } from '../src/presets/index.js';
@@ -77,8 +81,9 @@ describe('entry point imports', () => {
   });
 
   it('createDefiner type inference catches errors', () => {
-    const define = createDefiner(['field_present'] as const)
-      .withArgs<{ field_present: FieldPresentArgs }>();
+    const define = createDefiner(['field_present'] as const).withArgs<{
+      field_present: FieldPresentArgs;
+    }>();
 
     const def = define.entity({
       name: 'Test',

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine, builtinPresets } from '../src/index.js';
-import { createDefiner, defineSchema, extractRules, extractManualTransitions } from '../src/schema/index.js';
+import {
+  createDefiner,
+  defineSchema,
+  extractRules,
+  extractManualTransitions,
+} from '../src/schema/index.js';
 import { generateDocs, updateDocContent } from '../src/schema/index.js';
 import type { BuiltinPresetArgsMap } from '../src/presets/index.js';
 
@@ -23,8 +28,10 @@ describe('quickstart: Basic Usage (Engine Only)', () => {
 
 describe('quickstart: Type-Safe Schema Definition', () => {
   it('defines entity with type-safe presets and validates transitions', () => {
-    const define = createDefiner(['field_present', 'field_equals'] as const)
-      .withArgs<BuiltinPresetArgsMap>();
+    const define = createDefiner([
+      'field_present',
+      'field_equals',
+    ] as const).withArgs<BuiltinPresetArgsMap>();
 
     const hypothesis = define.entity({
       name: 'Hypothesis',
@@ -65,8 +72,9 @@ describe('quickstart: Type-Safe Schema Definition', () => {
 
 describe('quickstart: Documentation Generation', () => {
   it('generates docs and replaces AUTO markers', () => {
-    const define = createDefiner(['field_present'] as const)
-      .withArgs<{ field_present: { name: string } }>();
+    const define = createDefiner(['field_present'] as const).withArgs<{
+      field_present: { name: string };
+    }>();
 
     const hypothesis = define.entity({
       name: 'Hypothesis',

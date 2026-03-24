@@ -18,12 +18,14 @@ export interface EntityDefinition<
   transitions?: Array<{
     from: TStatuses[number];
     to: TStatuses[number];
-    conditions?: Array<{
-      [K in TPresetNames[number]]: {
-        fn: K;
-        args: K extends keyof TArgsMap ? TArgsMap[K] : Record<string, unknown>;
-      };
-    }[TPresetNames[number]]>;
+    conditions?: Array<
+      {
+        [K in TPresetNames[number]]: {
+          fn: K;
+          args: K extends keyof TArgsMap ? TArgsMap[K] : Record<string, unknown>;
+        };
+      }[TPresetNames[number]]
+    >;
   }>;
   manualTransitions?: Array<{
     from: TStatuses[number] | 'ANY';
@@ -52,10 +54,7 @@ export interface SchemaDefinition<TPresetNames extends readonly string[]> {
  * A definer with preset args type safety.
  * Created via `createDefiner(presetNames).withArgs<ArgsMap>()`.
  */
-export interface Definer<
-  TPresetNames extends readonly string[],
-  TArgsMap extends PresetArgsMap,
-> {
+export interface Definer<TPresetNames extends readonly string[], TArgsMap extends PresetArgsMap> {
   entity<const TStatuses extends readonly string[]>(
     definition: EntityDefinition<TStatuses, TPresetNames, TArgsMap>,
   ): EntityDefinition<TStatuses, TPresetNames, TArgsMap>;

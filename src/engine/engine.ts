@@ -14,11 +14,7 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
   const { presets } = options;
   const registeredNames = Object.keys(presets);
 
-  function evaluate(
-    entity: Entity,
-    context: TContext,
-    rule: TransitionRule,
-  ): EvaluationResult {
+  function evaluate(entity: Entity, context: TContext, rule: TransitionRule): EvaluationResult {
     const matchedIdSet = new Set<string>();
 
     for (const condition of rule.conditions) {

@@ -23,11 +23,10 @@ export interface PresetResult {
  * TContext is injected by the consumer (e.g., Graph, DB connection).
  * TArgs allows type-safe arguments per preset.
  */
-export type PresetFn<TContext = unknown, TArgs extends Record<string, unknown> = Record<string, unknown>> = (
-  entity: Entity,
-  context: TContext,
-  args: TArgs,
-) => PresetResult;
+export type PresetFn<
+  TContext = unknown,
+  TArgs extends Record<string, unknown> = Record<string, unknown>,
+> = (entity: Entity, context: TContext, args: TArgs) => PresetResult;
 
 /**
  * A condition within a transition rule.
@@ -107,7 +106,11 @@ export interface Engine<TContext> {
    * each passing rule produces a separate entry. Map to `status` and deduplicate
    * if you only need unique target statuses.
    */
-  getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): ValidTransition[];
+  getValidTransitions(
+    entity: Entity,
+    context: TContext,
+    rules: TransitionRule[],
+  ): ValidTransition[];
 
   /** Validate whether a specific transition is allowed (auto then manual fallback). */
   validate(
@@ -141,4 +144,3 @@ export class UnknownPresetError extends Error {
     this.name = 'UnknownPresetError';
   }
 }
-
