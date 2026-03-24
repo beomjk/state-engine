@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,8 +24,8 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run build
       - name: Coverage Report
-        if: always() && github.event_name == 'pull_request' && matrix.node-version == 22
+        if: always() && github.event_name == 'pull_request' && matrix.node-version == 24
         uses: davelosert/vitest-coverage-report-action@v2
