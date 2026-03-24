@@ -22,7 +22,7 @@ export {
   extractManualTransitions,
   extractRules,
 } from './schema/index.js';
-export type { EntityDefinition, SchemaDefinition } from './schema/index.js';
+export type { EntityDefinition, PresetArgsMap, SchemaDefinition } from './schema/index.js';
 export { generateDocs, updateDocContent } from './schema/index.js';
 export type { DocGeneratorOptions } from './schema/index.js';
 
