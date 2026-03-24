@@ -3,8 +3,6 @@ import type { SchemaDefinition } from './define.js';
 export interface DocGeneratorOptions {
   /** Which tables to generate. */
   tables: ('statuses' | 'transitions' | 'manual-transitions')[];
-  /** Marker tag format. Default: '<!-- AUTO:{name} -->' */
-  markerFormat?: string;
 }
 
 /**
@@ -75,7 +73,7 @@ export function updateDocContent(
   content: string,
   schema: SchemaDefinition<readonly string[]>,
   options?: DocGeneratorOptions,
-): { updated: boolean; tablesReplaced: string[] } {
+): { content: string; updated: boolean; tablesReplaced: string[] } {
   const docs = generateDocs(schema, options);
   const tablesReplaced: string[] = [];
   let result = content;
@@ -96,5 +94,5 @@ export function updateDocContent(
     tablesReplaced.push(name);
   }
 
-  return { updated: tablesReplaced.length > 0, tablesReplaced };
+  return { content: result, updated: tablesReplaced.length > 0, tablesReplaced };
 }

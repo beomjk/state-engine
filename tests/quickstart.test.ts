@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine, builtinPresets } from '../src/index.js';
-import { defineEntity, defineSchema, extractRules, extractManualTransitions } from '../src/schema/index.js';
+import { createDefiner, defineSchema, extractRules, extractManualTransitions } from '../src/schema/index.js';
 import { generateDocs, updateDocContent } from '../src/schema/index.js';
 import type { BuiltinPresetArgsMap } from '../src/presets/index.js';
 
@@ -23,13 +23,10 @@ describe('quickstart: Basic Usage (Engine Only)', () => {
 
 describe('quickstart: Type-Safe Schema Definition', () => {
   it('defines entity with type-safe presets and validates transitions', () => {
-    const presetNames = ['field_present', 'field_equals'] as const;
-    const presetArgs: BuiltinPresetArgsMap = {
-      field_present: { name: '' },
-      field_equals: { name: '', value: undefined },
-    };
+    const define = createDefiner(['field_present', 'field_equals'] as const)
+      .withArgs<BuiltinPresetArgsMap>();
 
-    const hypothesis = defineEntity(presetNames, presetArgs, {
+    const hypothesis = define.entity({
       name: 'Hypothesis',
       statuses: ['PROPOSED', 'TESTING', 'VALIDATED', 'REJECTED', 'DEFERRED'] as const,
       transitions: [
@@ -68,10 +65,10 @@ describe('quickstart: Type-Safe Schema Definition', () => {
 
 describe('quickstart: Documentation Generation', () => {
   it('generates docs and replaces AUTO markers', () => {
-    const presetNames = ['field_present'] as const;
-    const argsMap = { field_present: { name: '' } };
+    const define = createDefiner(['field_present'] as const)
+      .withArgs<{ field_present: { name: string } }>();
 
-    const hypothesis = defineEntity(presetNames, argsMap, {
+    const hypothesis = define.entity({
       name: 'Hypothesis',
       statuses: ['PROPOSED', 'TESTING'] as const,
       transitions: [
@@ -97,8 +94,9 @@ describe('quickstart: Documentation Generation', () => {
 old content
 <!-- /AUTO:transitions -->
 `;
-    const { updated, tablesReplaced } = updateDocContent(markdown, schema);
+    const { content, updated, tablesReplaced } = updateDocContent(markdown, schema);
     expect(updated).toBe(true);
     expect(tablesReplaced).toContain('transitions');
+    expect(content).toContain('field_present(name=assignee)');
   });
 });

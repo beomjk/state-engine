@@ -1,15 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { generateDocs, updateDocContent } from '../../src/schema/docs.js';
-import { defineEntity, defineSchema } from '../../src/schema/define.js';
+import { createDefiner, defineSchema } from '../../src/schema/define.js';
+import type { BuiltinPresetArgsMap } from '../../src/presets/builtins.js';
 
 const presetNames = ['field_present', 'field_equals'] as const;
-const argsMap = {
-  field_present: { name: '' },
-  field_equals: { name: '', value: undefined as unknown },
-};
+const define = createDefiner(presetNames).withArgs<BuiltinPresetArgsMap>();
 
 function makeSchema() {
-  const hypothesis = defineEntity(presetNames, argsMap, {
+  const hypothesis = define.entity({
     name: 'Hypothesis',
     statuses: ['PROPOSED', 'TESTING', 'VALIDATED', 'REJECTED'] as const,
     transitions: [
@@ -75,7 +73,7 @@ describe('generateDocs', () => {
   });
 
   it('shows em-dash for transitions with no conditions', () => {
-    const entity = defineEntity(presetNames, argsMap, {
+    const entity = define.entity({
       name: 'Simple',
       statuses: ['A', 'B'] as const,
       transitions: [{ from: 'A', to: 'B' }],
@@ -88,7 +86,7 @@ describe('generateDocs', () => {
 });
 
 describe('updateDocContent', () => {
-  it('replaces AUTO markers and returns { updated: true, tablesReplaced }', () => {
+  it('replaces AUTO markers and returns updated content', () => {
     const schema = makeSchema();
     const content = `# States
 <!-- AUTO:statuses -->
@@ -106,9 +104,13 @@ old transitions
     expect(result.updated).toBe(true);
     expect(result.tablesReplaced).toContain('statuses');
     expect(result.tablesReplaced).toContain('transitions');
+    expect(result.content).toContain('| PROPOSED |');
+    expect(result.content).toContain('field_present(name=assignee)');
+    expect(result.content).not.toContain('old content here');
+    expect(result.content).not.toContain('old transitions');
   });
 
-  it('returns { updated: false } when no markers found', () => {
+  it('returns original content unchanged when no markers found', () => {
     const schema = makeSchema();
     const content = '# No markers here\nJust plain text.';
 
@@ -116,6 +118,7 @@ old transitions
 
     expect(result.updated).toBe(false);
     expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
   });
 
   it('preserves content outside markers', () => {
@@ -127,23 +130,22 @@ old
 Footer`;
 
     const result = updateDocContent(content, schema);
-    const output = `Header\n<!-- AUTO:statuses -->\n${generateDocs(schema, { tables: ['statuses'] }).statuses}\n<!-- /AUTO:statuses -->\nFooter`;
 
     expect(result.updated).toBe(true);
-    // Verify markers and surrounding text preserved
-    expect(output).toContain('Header');
-    expect(output).toContain('Footer');
-    expect(output).toContain('| PROPOSED |');
+    expect(result.content).toContain('Header');
+    expect(result.content).toContain('Footer');
+    expect(result.content).toContain('| PROPOSED |');
+    expect(result.content).not.toContain('\nold\n');
   });
 });
 
 describe('scale test (SC-003)', () => {
   it('handles 5 entities with 20 transition rules', () => {
     const statuses = ['S1', 'S2', 'S3', 'S4', 'S5'] as const;
-    const entities: Record<string, ReturnType<typeof defineEntity>> = {};
+    const entities: Record<string, ReturnType<typeof define.entity>> = {};
 
     for (let i = 0; i < 5; i++) {
-      entities[`entity_${i}`] = defineEntity(presetNames, argsMap, {
+      entities[`entity_${i}`] = define.entity({
         name: `Entity${i}`,
         statuses,
         transitions: [

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // Entry point: @beomjk/state-engine (root)
 import {
+  createDefiner,
   createEngine,
   defineEntity,
   defineSchema,
@@ -25,13 +26,14 @@ import type {
 import { createEngine as createEngine2 } from '../src/engine/index.js';
 
 // Entry point: @beomjk/state-engine/schema
-import { defineEntity as de2, extractRules as er2 } from '../src/schema/index.js';
+import { createDefiner as cd2, defineEntity as de2, extractRules as er2 } from '../src/schema/index.js';
 
 // Entry point: @beomjk/state-engine/presets
 import { builtinPresets as bp2 } from '../src/presets/index.js';
 
 describe('entry point imports', () => {
   it('root entry exports all public API', () => {
+    expect(createDefiner).toBeTypeOf('function');
     expect(createEngine).toBeTypeOf('function');
     expect(defineEntity).toBeTypeOf('function');
     expect(defineSchema).toBeTypeOf('function');
@@ -48,6 +50,7 @@ describe('entry point imports', () => {
   });
 
   it('schema entry exports schema API', () => {
+    expect(cd2).toBeTypeOf('function');
     expect(de2).toBeTypeOf('function');
     expect(er2).toBeTypeOf('function');
   });
@@ -73,11 +76,11 @@ describe('entry point imports', () => {
     expect(validation.valid).toBe(true);
   });
 
-  it('defineEntity type inference catches errors', () => {
-    const presetNames = ['field_present'] as const;
-    const argsMap: { field_present: FieldPresentArgs } = { field_present: { name: '' } };
+  it('createDefiner type inference catches errors', () => {
+    const define = createDefiner(['field_present'] as const)
+      .withArgs<{ field_present: FieldPresentArgs }>();
 
-    const def = defineEntity(presetNames, argsMap, {
+    const def = define.entity({
       name: 'Test',
       statuses: ['X', 'Y'] as const,
       transitions: [

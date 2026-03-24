@@ -1,15 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { defineEntity, defineSchema, extractRules, extractManualTransitions } from '../../src/schema/define.js';
+import { createDefiner, defineEntity, defineSchema, extractRules, extractManualTransitions } from '../../src/schema/define.js';
+import type { BuiltinPresetArgsMap } from '../../src/presets/builtins.js';
 
-const presetNames = ['field_present', 'field_equals'] as const;
-const argsMap = {
-  field_present: { name: '' },
-  field_equals: { name: '', value: undefined as unknown },
-};
+const define = createDefiner(['field_present', 'field_equals'] as const)
+  .withArgs<BuiltinPresetArgsMap>();
 
-describe('defineEntity / defineSchema', () => {
-  it('defineEntity returns definition unchanged', () => {
-    const def = defineEntity(presetNames, argsMap, {
+describe('createDefiner / defineSchema', () => {
+  it('define.entity returns definition unchanged', () => {
+    const def = define.entity({
       name: 'Hypothesis',
       statuses: ['PROPOSED', 'TESTING', 'VALIDATED'] as const,
       transitions: [
@@ -28,24 +26,37 @@ describe('defineEntity / defineSchema', () => {
     expect(def.manualTransitions).toHaveLength(1);
   });
 
+  it('createDefiner without withArgs still checks statuses and preset names', () => {
+    const simpleDefine = createDefiner(['field_present'] as const);
+    const def = simpleDefine.entity({
+      name: 'Simple',
+      statuses: ['A', 'B'] as const,
+      transitions: [
+        { from: 'A', to: 'B', conditions: [{ fn: 'field_present', args: { name: 'x' } }] },
+      ],
+    });
+    expect(def.name).toBe('Simple');
+    expect(def.transitions).toHaveLength(1);
+  });
+
   it('defineSchema returns schema definition', () => {
-    const entity = defineEntity(presetNames, argsMap, {
+    const entity = define.entity({
       name: 'Hypothesis',
       statuses: ['PROPOSED', 'TESTING'] as const,
       transitions: [],
     });
 
     const schema = defineSchema({
-      presetNames,
+      presetNames: ['field_present', 'field_equals'] as const,
       entities: { hypothesis: entity },
     });
 
-    expect(schema.presetNames).toEqual(presetNames);
+    expect(schema.presetNames).toEqual(['field_present', 'field_equals']);
     expect(schema.entities.hypothesis.name).toBe('Hypothesis');
   });
 
   it('extractRules converts transitions to TransitionRule[]', () => {
-    const def = defineEntity(presetNames, argsMap, {
+    const def = define.entity({
       name: 'Test',
       statuses: ['A', 'B'] as const,
       transitions: [
@@ -65,7 +76,7 @@ describe('defineEntity / defineSchema', () => {
   });
 
   it('extractRules returns empty array when no transitions', () => {
-    const def = defineEntity(presetNames, argsMap, {
+    const def = define.entity({
       name: 'Test',
       statuses: ['A'] as const,
     });
@@ -74,7 +85,7 @@ describe('defineEntity / defineSchema', () => {
   });
 
   it('extractManualTransitions converts manual transitions', () => {
-    const def = defineEntity(presetNames, argsMap, {
+    const def = define.entity({
       name: 'Test',
       statuses: ['A', 'B'] as const,
       manualTransitions: [
@@ -92,18 +103,28 @@ describe('defineEntity / defineSchema', () => {
   });
 
   it('extractManualTransitions returns empty array when none defined', () => {
-    const def = defineEntity(presetNames, argsMap, {
+    const def = define.entity({
       name: 'Test',
       statuses: ['A'] as const,
     });
 
     expect(extractManualTransitions(def)).toEqual([]);
   });
+
+  it('legacy defineEntity still works (deprecated)', () => {
+    const presetNames = ['field_present', 'field_equals'] as const;
+    const argsMap = { field_present: { name: '' }, field_equals: { name: '', value: undefined as unknown } };
+    const def = defineEntity(presetNames, argsMap, {
+      name: 'Legacy',
+      statuses: ['A'] as const,
+    });
+    expect(def.name).toBe('Legacy');
+  });
 });
 
 describe('type-level safety', () => {
   it('misspelled status name produces compile error', () => {
-    defineEntity(presetNames, argsMap, {
+    define.entity({
       name: 'Test',
       statuses: ['A', 'B'] as const,
       transitions: [
@@ -117,7 +138,7 @@ describe('type-level safety', () => {
   });
 
   it('unregistered preset name produces compile error', () => {
-    defineEntity(presetNames, argsMap, {
+    define.entity({
       name: 'Test',
       statuses: ['A', 'B'] as const,
       transitions: [
@@ -132,7 +153,7 @@ describe('type-level safety', () => {
   });
 
   it('incorrect preset args shape produces compile error', () => {
-    defineEntity(presetNames, argsMap, {
+    define.entity({
       name: 'Test',
       statuses: ['A', 'B'] as const,
       transitions: [
@@ -147,7 +168,10 @@ describe('type-level safety', () => {
   });
 
   it('defineSchema enforces shared preset names across entities', () => {
-    const entity = defineEntity(['field_present'] as const, { field_present: { name: '' } }, {
+    const narrowDefine = createDefiner(['field_present'] as const)
+      .withArgs<{ field_present: { name: string } }>();
+
+    const entity = narrowDefine.entity({
       name: 'Test',
       statuses: ['A'] as const,
     });

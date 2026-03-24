@@ -15,8 +15,13 @@ describe('builtinPresets', () => {
       expect(result).toEqual({ met: true, matchedIds: [] });
     });
 
-    it('met when field is a number (including 0 is truthy for != null)', () => {
-      const result = fp(makeEntity({ count: 42 }), {}, { name: 'count' });
+    it('met when field is 0 (!= null passes for zero)', () => {
+      const result = fp(makeEntity({ count: 0 }), {}, { name: 'count' });
+      expect(result).toEqual({ met: true, matchedIds: [] });
+    });
+
+    it('met when field is false (boolean false is != null)', () => {
+      const result = fp(makeEntity({ active: false }), {}, { name: 'active' });
       expect(result).toEqual({ met: true, matchedIds: [] });
     });
 

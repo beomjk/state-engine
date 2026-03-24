@@ -17,12 +17,19 @@ export { UnknownPresetError } from './engine/index.js';
 
 // Schema
 export {
+  createDefiner,
   defineEntity,
   defineSchema,
   extractManualTransitions,
   extractRules,
 } from './schema/index.js';
-export type { EntityDefinition, PresetArgsMap, SchemaDefinition } from './schema/index.js';
+export type {
+  Definer,
+  DefinerWithoutArgs,
+  EntityDefinition,
+  PresetArgsMap,
+  SchemaDefinition,
+} from './schema/index.js';
 export { generateDocs, updateDocContent } from './schema/index.js';
 export type { DocGeneratorOptions } from './schema/index.js';
 
