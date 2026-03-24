@@ -102,6 +102,10 @@ export interface Engine<TContext> {
    * Manual transitions are excluded by design (DD-1): they have no conditions
    * to evaluate, so consumers should union these results with their manual
    * transitions filtered by current status or 'ANY'.
+   *
+   * Note: if multiple rules share the same `to` status with different conditions,
+   * each passing rule produces a separate entry. Map to `status` and deduplicate
+   * if you only need unique target statuses.
    */
   getValidTransitions(entity: Entity, context: TContext, rules: TransitionRule[]): ValidTransition[];
 
@@ -119,6 +123,7 @@ export interface Engine<TContext> {
  * Options for createEngine().
  */
 export interface EngineOptions<TContext> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- type erasure for heterogeneous preset args
   presets: Record<string, PresetFn<TContext, any>>;
 }
 

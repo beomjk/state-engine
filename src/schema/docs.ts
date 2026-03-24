@@ -86,6 +86,7 @@ export function updateDocContent(
     const endIdx = result.indexOf(endMarker);
 
     if (startIdx === -1 || endIdx === -1) continue;
+    if (startIdx >= endIdx) continue;
 
     const before = result.slice(0, startIdx + startMarker.length);
     const after = result.slice(endIdx);

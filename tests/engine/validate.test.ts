@@ -68,6 +68,52 @@ describe('engine.validate', () => {
     }
   });
 
+  it('skips auto rules where from matches but to does not', () => {
+    const engine = createEngine({ presets: { check: alwaysMet } });
+    const rules: TransitionRule[] = [
+      { from: 'PROPOSED', to: 'REJECTED', conditions: [{ fn: 'check', args: {} }] },
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'check', args: {} }] },
+    ];
+
+    const result = engine.validate(entity, {}, rules, 'TESTING');
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.rule).toEqual(rules[1]);
+    }
+  });
+
+  it('skips manual transitions where to does not match target', () => {
+    const engine = createEngine({ presets: {} });
+    const manual: ManualTransition[] = [
+      { from: 'ANY', to: 'REJECTED' },
+      { from: 'ANY', to: 'TESTING' },
+    ];
+
+    const result = engine.validate(entity, {}, [], 'TESTING', manual);
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.rule).toBeNull();
+    }
+  });
+
+  it('falls through to second auto rule when first fails', () => {
+    const engine = createEngine({ presets: { pass: alwaysMet, fail: neverMet } });
+    const rules: TransitionRule[] = [
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'fail', args: {} }] },
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'pass', args: {} }] },
+    ];
+
+    const result = engine.validate(entity, {}, rules, 'TESTING');
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.rule).toEqual(rules[1]);
+      expect(result.matchedIds).toEqual(['m1']);
+    }
+  });
+
   it('no auto or manual match returns { valid: false, reason }', () => {
     const engine = createEngine({ presets: { check: neverMet } });
     const manual: ManualTransition[] = [{ from: 'OTHER', to: 'TESTING' }];

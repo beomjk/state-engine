@@ -39,6 +39,11 @@ export interface SchemaDefinition<TPresetNames extends readonly string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entities: Record<string, EntityDefinition<readonly string[], TPresetNames, any>>;
   policy?: {
+    /**
+     * Metadata only — the engine does not enforce this (FR-015).
+     * Consumers inspect `schema.policy.mode` to decide enforcement strategy:
+     * e.g., throw in CLI, return HTTP 400 in API, log warning in lenient contexts.
+     */
     mode: 'strict' | 'warn' | 'off';
   };
 }
