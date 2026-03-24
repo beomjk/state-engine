@@ -19,7 +19,7 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
     context: TContext,
     rule: TransitionRule,
   ): EvaluationResult {
-    const allMatchedIds: string[] = [];
+    const matchedIdSet = new Set<string>();
 
     for (const condition of rule.conditions) {
       const presetFn = presets[condition.fn];
@@ -31,11 +31,12 @@ export function createEngine<TContext>(options: EngineOptions<TContext>): Engine
       if (!result.met) {
         return { met: false, matchedIds: [] };
       }
-      allMatchedIds.push(...result.matchedIds);
+      for (const id of result.matchedIds) {
+        matchedIdSet.add(id);
+      }
     }
 
-    // Empty conditions = always passes
-    return { met: true, matchedIds: allMatchedIds };
+    return { met: true, matchedIds: [...matchedIdSet] };
   }
 
   function getValidTransitions(
