@@ -1,0 +1,15 @@
+src/
+tests/
+tsconfig.json
+tsconfig.build.json
+tsup.config.ts
+vitest.config.ts
+eslint.config.mjs
+.prettierrc
+.github/
+.claude/
+.specify/
+handoffs/
+specs/
+coverage/
+node_modules/
