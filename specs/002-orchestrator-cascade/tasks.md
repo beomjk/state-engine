@@ -40,15 +40,15 @@
 
 ### Tests (RED)
 
-- [ ] T007 [US2] Write tests for relation definition (define.relation() accumulates, getRelations() returns, extractRelations() extracts from schema, direction defaults to 'default', metadata is opaque, duplicate relation name throws, invalid source/target entity type throws) in tests/schema/define.test.ts — tests MUST fail (RED)
+- [x] T007 [US2] Write tests for relation definition (define.relation() accumulates, getRelations() returns, extractRelations() extracts from schema, direction defaults to 'default', metadata is opaque, duplicate relation name throws, invalid source/target entity type throws) in tests/schema/define.test.ts — tests MUST fail (RED)
 
 ### Implementation (GREEN)
 
-- [ ] T008 [US2] Add RelationDefinition type (name, source, target, direction?, metadata?) and RelationInstance type (name, sourceId, targetId, metadata?) to src/schema/define.ts per data-model.md
-- [ ] T009 [US2] Extend createDefiner() to return objects with relation() and getRelations() methods — relation() accumulates into internal array, getRelations() returns accumulated RelationDefinition[] — update both DefinerWithoutArgs and Definer interfaces in src/schema/define.ts per contracts/orchestrator-api.md
-- [ ] T010 [US2] Add optional `relations?: RelationDefinition[]` field to SchemaDefinition interface and implement extractRelations() function in src/schema/define.ts. extractRelations() MUST validate: (a) relation names are unique within the schema, (b) source and target reference entity types defined in schema.entities. Throw descriptive error on violation. Returns [] when schema.relations is undefined or empty.
-- [ ] T011 [US2] Update src/schema/index.ts to re-export RelationDefinition, RelationInstance, extractRelations; update src/index.ts to re-export from schema
-- [ ] T012 [US2] Verify backward compatibility — run `npm test` and confirm all tests pass (RED tests from T007 now GREEN, existing tests unchanged)
+- [x] T008 [US2] Add RelationDefinition type (name, source, target, direction?, metadata?) and RelationInstance type (name, sourceId, targetId, metadata?) to src/schema/define.ts per data-model.md
+- [x] T009 [US2] Extend createDefiner() to return objects with relation() and getRelations() methods — relation() accumulates into internal array, getRelations() returns accumulated RelationDefinition[] — update both DefinerWithoutArgs and Definer interfaces in src/schema/define.ts per contracts/orchestrator-api.md
+- [x] T010 [US2] Add optional `relations?: RelationDefinition[]` field to SchemaDefinition interface and implement extractRelations() function in src/schema/define.ts. extractRelations() MUST validate: (a) relation names are unique within the schema, (b) source and target reference entity types defined in schema.entities. Throw descriptive error on violation. Returns [] when schema.relations is undefined or empty.
+- [x] T011 [US2] Update src/schema/index.ts to re-export RelationDefinition, RelationInstance, extractRelations; update src/index.ts to re-export from schema
+- [x] T012 [US2] Verify backward compatibility — run `npm test` and confirm all tests pass (RED tests from T007 now GREEN, existing tests unchanged)
 
 **Checkpoint**: Schema supports relation declarations. Existing API unchanged. `npm test` green.
 

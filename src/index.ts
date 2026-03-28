@@ -36,6 +36,22 @@ export type {
 export { generateDocs, generateMermaid, updateDocContent } from './schema/index.js';
 export type { DocGeneratorOptions } from './schema/index.js';
 
+// Orchestrator
+export { createOrchestrator, propagateAll } from './orchestrator/index.js';
+export type {
+  CascadeStep,
+  CascadeTrace,
+  Changeset,
+  ExecutionResult,
+  Orchestrator,
+  OrchestratorConfig,
+  PropagationStrategy,
+  SimulationResult,
+  StateChange,
+  UnresolvedEntity,
+  AvailableManualTransition,
+} from './orchestrator/index.js';
+
 // Presets
 export { builtinPresets } from './presets/index.js';
 export type { BuiltinPresetArgsMap, FieldEqualsArgs, FieldPresentArgs } from './presets/index.js';

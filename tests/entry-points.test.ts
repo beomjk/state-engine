@@ -33,6 +33,14 @@ import {
   extractRules as er2,
 } from '../src/schema/index.js';
 
+// Entry point: @beomjk/state-engine/orchestrator
+import { createOrchestrator, propagateAll } from '../src/orchestrator/index.js';
+import type {
+  CascadeTrace as _CascadeTrace,
+  SimulationResult as _SimulationResult,
+  Orchestrator as _Orchestrator,
+} from '../src/orchestrator/index.js';
+
 // Entry point: @beomjk/state-engine/presets
 import { builtinPresets as bp2 } from '../src/presets/index.js';
 
@@ -59,6 +67,11 @@ describe('entry point imports', () => {
     expect(cd2).toBeTypeOf('function');
     expect(de2).toBeTypeOf('function');
     expect(er2).toBeTypeOf('function');
+  });
+
+  it('orchestrator entry exports orchestrator API', () => {
+    expect(createOrchestrator).toBeTypeOf('function');
+    expect(propagateAll).toBeTypeOf('function');
   });
 
   it('presets entry exports presets API', () => {

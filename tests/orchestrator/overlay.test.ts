@@ -36,7 +36,7 @@ describe('StateOverlay', () => {
       const updated: Entity = { ...e1, status: 'SUPPORTED' };
       overlay.set('e1', updated);
       // Override takes priority
-      expect(overlay.get('e1')!.status).toBe('SUPPORTED');
+      expect(overlay.get('e1')?.status).toBe('SUPPORTED');
     });
   });
 
