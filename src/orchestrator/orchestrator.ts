@@ -1,4 +1,10 @@
-import type { Engine, Entity, TransitionRule, ManualTransition, ValidTransition } from '../engine/types.js';
+import type {
+  Engine,
+  Entity,
+  TransitionRule,
+  ManualTransition,
+  ValidTransition,
+} from '../engine/types.js';
 import type {
   CascadeStep,
   CascadeTrace,
@@ -58,9 +64,7 @@ function findDownstream(
 
       // Check if the changed entity is involved in this instance
       const isChangedEntity =
-        direction === 'default'
-          ? ri.sourceId === change.entityId
-          : ri.targetId === change.entityId;
+        direction === 'default' ? ri.sourceId === change.entityId : ri.targetId === change.entityId;
       if (!isChangedEntity) continue;
 
       // Apply propagation strategy
@@ -96,7 +100,12 @@ function runCascade<TContext>(
   const affected = new Set<string>();
 
   // Seed the queue with downstream of the trigger
-  const initialDownstream = findDownstream(triggerChange, relationDefs, relationInstances, propagation);
+  const initialDownstream = findDownstream(
+    triggerChange,
+    relationDefs,
+    relationInstances,
+    propagation,
+  );
   const queue: QueueEntry[] = initialDownstream.map((id) => ({
     entityId: id,
     triggeredBy: [triggerChange.entityId],

@@ -58,10 +58,15 @@ describe('simulate()', () => {
     );
     const relInstances: RelationInstance[] = [];
 
-    const result = orchestrator.simulate(entities, relInstances, {}, {
-      entityId: 'exp-001',
-      targetStatus: 'RUNNING',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      relInstances,
+      {},
+      {
+        entityId: 'exp-001',
+        targetStatus: 'RUNNING',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -84,10 +89,15 @@ describe('simulate()', () => {
     ];
 
     // What-if: exp-001 becomes COMPLETED
-    const result = orchestrator.simulate(entities, relInstances, {}, {
-      entityId: 'exp-001',
-      targetStatus: 'COMPLETED',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      relInstances,
+      {},
+      {
+        entityId: 'exp-001',
+        targetStatus: 'COMPLETED',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -107,10 +117,15 @@ describe('simulate()', () => {
     );
 
     // Force to COMPLETED even though DESIGNED->COMPLETED is not a valid rule
-    const result = orchestrator.simulate(entities, [], {}, {
-      entityId: 'exp-001',
-      targetStatus: 'COMPLETED',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'exp-001',
+        targetStatus: 'COMPLETED',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -123,10 +138,15 @@ describe('simulate()', () => {
     const { orchestrator } = setup();
     const entities = buildEntityMap();
 
-    const result = orchestrator.simulate(entities, [], {}, {
-      entityId: 'nonexistent',
-      targetStatus: 'RUNNING',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'nonexistent',
+        targetStatus: 'RUNNING',
+      },
+    );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;

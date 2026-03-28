@@ -2,7 +2,7 @@ import type { EntityDefinition, SchemaDefinition } from './define.js';
 
 export interface DocGeneratorOptions {
   /** Which tables to generate. */
-  tables: ('statuses' | 'transitions' | 'manual-transitions')[];
+  tables: ('statuses' | 'transitions' | 'manual-transitions' | 'relations')[];
 }
 
 /** Format a condition as `fn(key=value, ...)`. */
@@ -21,7 +21,7 @@ export function generateDocs(
   schema: SchemaDefinition<readonly string[]>,
   options?: DocGeneratorOptions,
 ): Record<string, string> {
-  const tables = options?.tables ?? ['statuses', 'transitions', 'manual-transitions'];
+  const tables = options?.tables ?? ['statuses', 'transitions', 'manual-transitions', 'relations'];
   const result: Record<string, string> = {};
 
   for (const table of tables) {
@@ -58,6 +58,17 @@ export function generateDocs(
         }
         lines.push('');
       }
+    }
+
+    if (table === 'relations' && schema.relations?.length) {
+      lines.push('| Relation | Source | Target | Direction | Metadata |');
+      lines.push('|----------|--------|--------|-----------|----------|');
+      for (const rel of schema.relations) {
+        const direction = rel.direction ?? 'default';
+        const metadata = rel.metadata ? JSON.stringify(rel.metadata) : '\u2014';
+        lines.push(`| ${rel.name} | ${rel.source} | ${rel.target} | ${direction} | ${metadata} |`);
+      }
+      lines.push('');
     }
 
     result[table] = lines.join('\n');

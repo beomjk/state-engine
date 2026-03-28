@@ -66,17 +66,17 @@
 
 > **Write ALL simulation tests FIRST. They MUST fail before implementation begins.**
 
-- [ ] T013 [P] [US1] Write simulate() basic tests (single entity no cascade, two entities with relation triggering cascade, what-if forcing invalid status, entity_not_found error) in tests/orchestrator/simulate.test.ts — tests MUST fail (RED)
-- [ ] T014 [P] [US1] Write cascade behavior tests (3-hop chain A->B->C, diamond convergence, cycle termination within maxDepth, convergence flag true/false, conflict detection -> unresolved with conflicting targets, manual transition reporting, application order correctness) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
-- [ ] T015 [P] [US1] Write edge case tests (empty entity map, entity with no relations, max depth reached -> truncated flag, preset throw -> cascade_error with partialTrace, missing entity in relation -> skip with warning) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
+- [x] T013 [P] [US1] Write simulate() basic tests (single entity no cascade, two entities with relation triggering cascade, what-if forcing invalid status, entity_not_found error) in tests/orchestrator/simulate.test.ts — tests MUST fail (RED)
+- [x] T014 [P] [US1] Write cascade behavior tests (3-hop chain A->B->C, diamond convergence, cycle termination within maxDepth, convergence flag true/false, conflict detection -> unresolved with conflicting targets, manual transition reporting, application order correctness) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
+- [x] T015 [P] [US1] Write edge case tests (empty entity map, entity with no relations, max depth reached -> truncated flag, preset throw -> cascade_error with partialTrace, missing entity in relation -> skip with warning) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
 
 ### Implementation (GREEN)
 
-- [ ] T016 [US1] Implement createOrchestrator() factory in src/orchestrator/orchestrator.ts — accepts OrchestratorConfig, stores engine/machines/relations/strategy/maxDepth, returns Orchestrator with simulate() and execute() (execute() can be a stub initially)
-- [ ] T017 [US1] Implement BFS cascade core as internal function in src/orchestrator/orchestrator.ts — uses StateOverlay for virtual state, iterates BFS queue, calls engine.getValidTransitions() per entity, handles: (a) single auto-match -> apply to overlay + add to steps + enqueue downstream, (b) multi-match -> add to unresolved + explore downstream with pre-cascade state, (c) no match -> skip, (d) new manual transitions -> add to availableManualTransitions. Respects maxCascadeDepth, tracks convergence, builds CascadeTrace
-- [ ] T018 [US1] Implement simulate() method in src/orchestrator/orchestrator.ts — force trigger status into overlay (what-if), run cascade core, return SimulationResult (ok/entity_not_found/cascade_error with partialTrace)
-- [ ] T019 [US1] Finalize src/orchestrator/index.ts exports (createOrchestrator, propagateAll default strategy, all types) and update src/index.ts with orchestrator re-exports
-- [ ] T020 [US1] Update tests/entry-points.test.ts to verify orchestrator entry point exports (createOrchestrator, propagateAll, type re-exports) — all RED tests from T013-T015 MUST now be GREEN
+- [x] T016 [US1] Implement createOrchestrator() factory in src/orchestrator/orchestrator.ts — accepts OrchestratorConfig, stores engine/machines/relations/strategy/maxDepth, returns Orchestrator with simulate() and execute() (execute() can be a stub initially)
+- [x] T017 [US1] Implement BFS cascade core as internal function in src/orchestrator/orchestrator.ts — uses StateOverlay for virtual state, iterates BFS queue, calls engine.getValidTransitions() per entity, handles: (a) single auto-match -> apply to overlay + add to steps + enqueue downstream, (b) multi-match -> add to unresolved + explore downstream with pre-cascade state, (c) no match -> skip, (d) new manual transitions -> add to availableManualTransitions. Respects maxCascadeDepth, tracks convergence, builds CascadeTrace
+- [x] T018 [US1] Implement simulate() method in src/orchestrator/orchestrator.ts — force trigger status into overlay (what-if), run cascade core, return SimulationResult (ok/entity_not_found/cascade_error with partialTrace)
+- [x] T019 [US1] Finalize src/orchestrator/index.ts exports (createOrchestrator, propagateAll default strategy, all types) and update src/index.ts with orchestrator re-exports
+- [x] T020 [US1] Update tests/entry-points.test.ts to verify orchestrator entry point exports (createOrchestrator, propagateAll, type re-exports) — all RED tests from T013-T015 MUST now be GREEN
 
 **Checkpoint**: `simulate()` works for all cascade scenarios. MVP deliverable. `npm test` green.
 
@@ -92,11 +92,11 @@
 
 ### Tests (RED)
 
-- [ ] T021 [US3] Write execute() tests (valid transition produces changeset, invalid transition returns validation_failed with reason, entity_not_found when trigger entity missing from map, changeset.changes matches trace.steps as StateChange[], changeset.trace is complete, changeset.unresolved shortcut works, execute result matches simulate prediction) in tests/orchestrator/execute.test.ts — tests MUST fail (RED)
+- [x] T021 [US3] Write execute() tests (valid transition produces changeset, invalid transition returns validation_failed with reason, entity_not_found when trigger entity missing from map, changeset.changes matches trace.steps as StateChange[], changeset.trace is complete, changeset.unresolved shortcut works, execute result matches simulate prediction) in tests/orchestrator/execute.test.ts — tests MUST fail (RED)
 
 ### Implementation (GREEN)
 
-- [ ] T022 [US3] Implement execute() method in src/orchestrator/orchestrator.ts — validate trigger transition via engine.validate(), if invalid return validation_failed error, if valid run cascade core (without what-if forcing), wrap result in Changeset (changes: StateChange[], trace, unresolved) — all RED tests from T021 MUST now be GREEN
+- [x] T022 [US3] Implement execute() method in src/orchestrator/orchestrator.ts — validate trigger transition via engine.validate(), if invalid return validation_failed error, if valid run cascade core (without what-if forcing), wrap result in Changeset (changes: StateChange[], trace, unresolved) — all RED tests from T021 MUST now be GREEN
 
 **Checkpoint**: `execute()` validates + cascades + returns changeset. `npm test` green.
 
@@ -112,13 +112,13 @@
 
 ### Tests (RED)
 
-- [ ] T023 [P] [US4] Write strategy tests (custom filter blocks 'blocks' classification, default propagates all, strategy receives correct StateChange + RelationInstance, strategy metadata access works) in tests/orchestrator/strategy.test.ts — tests MUST fail (RED)
-- [ ] T024 [P] [US5] Write matchedIds dependency tests (preset returns specific matchedIds -> only those entities re-evaluated, matchedIds update on re-evaluation -> dependency map refreshes, empty matchedIds -> falls back to relation-based type-level propagation) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
+- [x] T023 [P] [US4] Write strategy tests (custom filter blocks 'blocks' classification, default propagates all, strategy receives correct StateChange + RelationInstance, strategy metadata access works) in tests/orchestrator/strategy.test.ts — tests MUST fail (RED)
+- [x] T024 [P] [US5] Write matchedIds dependency tests (preset returns specific matchedIds -> only those entities re-evaluated, matchedIds update on re-evaluation -> dependency map refreshes, empty matchedIds -> falls back to relation-based type-level propagation) in tests/orchestrator/cascade.test.ts — tests MUST fail (RED)
 
 ### Implementation (GREEN)
 
-- [ ] T025 [US4] Integrate propagation strategy into BFS cascade loop in src/orchestrator/orchestrator.ts — before enqueueing a neighbor for re-evaluation, call strategy(change, relationInstance) and skip if false. Default propagateAll strategy already in types.
-- [ ] T026 [US5] Implement matchedIds-based instance targeting in BFS cascade loop in src/orchestrator/orchestrator.ts — after engine.getValidTransitions() returns, collect matchedIds from evaluation results, use reverse mapping (matchedId -> which entities depend on it) to determine which specific entity instances to enqueue instead of all type-level neighbors. Precedence: if matchedIds are present, use them for instance-level targeting; if empty/absent, fall back to RelationInstance[]-based instance connections; RelationDefinition[] type-level propagation is the final fallback when no instance-level data exists. All RED tests from T023-T024 MUST now be GREEN.
+- [x] T025 [US4] Integrate propagation strategy into BFS cascade loop in src/orchestrator/orchestrator.ts — before enqueueing a neighbor for re-evaluation, call strategy(change, relationInstance) and skip if false. Default propagateAll strategy already in types.
+- [x] T026 [US5] Implement matchedIds-based instance targeting in BFS cascade loop in src/orchestrator/orchestrator.ts — after engine.getValidTransitions() returns, collect matchedIds from evaluation results, use reverse mapping (matchedId -> which entities depend on it) to determine which specific entity instances to enqueue instead of all type-level neighbors. Precedence: if matchedIds are present, use them for instance-level targeting; if empty/absent, fall back to RelationInstance[]-based instance connections; RelationDefinition[] type-level propagation is the final fallback when no instance-level data exists. All RED tests from T023-T024 MUST now be GREEN.
 
 **Checkpoint**: Propagation is filterable. Instance-level targeting works. `npm test` green.
 
@@ -179,21 +179,25 @@ Write tests (RED) -> Verify tests FAIL -> Implement (GREEN) -> Verify tests PASS
 ### Parallel Opportunities
 
 **Within Phase 1** (all [P]):
+
 ```
 T002 (build config) || T003 (barrel file) || T004 (fixtures) || T005 (overlay tests)
 ```
 
 **Within Phase 3 tests** (all [P]):
+
 ```
 T013 (simulate tests) || T014 (cascade tests) || T015 (edge case tests)
 ```
 
 **Phase 4 || Phase 5** (after Phase 3):
+
 ```
 T021-T022 (execute) || T023-T026 (strategy + matchedIds)
 ```
 
 **Within Phase 5 tests** (all [P]):
+
 ```
 T023 (strategy tests) || T024 (matchedIds tests)
 ```
@@ -223,6 +227,7 @@ T023 (strategy tests) || T024 (matchedIds tests)
 **US2 (Schema Relations) + US1 (Simulate)** = 20 tasks (T001-T020)
 
 This delivers:
+
 - Declarative relation schema
 - Full cascade simulation with what-if
 - Multi-hop, cycle-safe, conflict-aware cascade detection

@@ -150,7 +150,12 @@ describe('relation definitions', () => {
   it('define.relation() accumulates definitions', () => {
     const d = createDefiner(['field_present'] as const);
     d.relation({ name: 'tests', source: 'experiment', target: 'hypothesis' });
-    d.relation({ name: 'depends_on', source: 'analysis', target: 'experiment', direction: 'reverse' });
+    d.relation({
+      name: 'depends_on',
+      source: 'analysis',
+      target: 'experiment',
+      direction: 'reverse',
+    });
     expect(d.getRelations()).toHaveLength(2);
   });
 
@@ -164,7 +169,9 @@ describe('relation definitions', () => {
   });
 
   it('relation() and getRelations() work on Definer with args', () => {
-    const d = createDefiner(['field_present'] as const).withArgs<{ field_present: { name: string } }>();
+    const d = createDefiner(['field_present'] as const).withArgs<{
+      field_present: { name: string };
+    }>();
     d.relation({ name: 'supports', source: 'experiment', target: 'hypothesis' });
     expect(d.getRelations()).toHaveLength(1);
   });

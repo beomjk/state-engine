@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import { createOrchestrator } from '../../src/orchestrator/orchestrator.js';
 import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
-import { buildEntityMap, makeEntity, fieldEquals, alwaysMet, throwingPreset, returnsIds } from './fixtures.js';
+import {
+  buildEntityMap,
+  makeEntity,
+  fieldEquals,
+  alwaysMet,
+  throwingPreset,
+  returnsIds,
+} from './fixtures.js';
 
 /**
  * Helper to build an orchestrator with custom machines and relations.
@@ -32,14 +39,10 @@ describe('cascade behavior', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeC: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [
@@ -58,10 +61,15 @@ describe('cascade behavior', () => {
       { name: 'b_to_c', sourceId: 'b1', targetId: 'c1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -77,19 +85,13 @@ describe('cascade behavior', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeC: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeD: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [
@@ -113,10 +115,15 @@ describe('cascade behavior', () => {
       { name: 'c_d', sourceId: 'c1', targetId: 'd1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -161,10 +168,15 @@ describe('cascade behavior', () => {
       { name: 'b_a', sourceId: 'b1', targetId: 'a1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'S2',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'S2',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -177,9 +189,7 @@ describe('cascade behavior', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
@@ -189,14 +199,17 @@ describe('cascade behavior', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -222,14 +235,17 @@ describe('cascade behavior', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -257,14 +273,17 @@ describe('cascade behavior', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -283,14 +302,10 @@ describe('cascade behavior', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeC: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [
@@ -309,10 +324,15 @@ describe('cascade behavior', () => {
       { name: 'a_c', sourceId: 'a1', targetId: 'c1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -330,10 +350,15 @@ describe('edge cases', () => {
       relations: [],
     });
 
-    const result = orchestrator.simulate(new Map(), [], {}, {
-      entityId: 'x',
-      targetStatus: 'Y',
-    });
+    const result = orchestrator.simulate(
+      new Map(),
+      [],
+      {},
+      {
+        entityId: 'x',
+        targetStatus: 'Y',
+      },
+    );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -350,10 +375,15 @@ describe('edge cases', () => {
 
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
 
-    const result = orchestrator.simulate(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -393,10 +423,15 @@ describe('edge cases', () => {
       { name: 'b_a', sourceId: 'b1', targetId: 'a1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'S2',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'S2',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -409,9 +444,7 @@ describe('edge cases', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'throw_preset', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'throw_preset', args: {} }] }],
         },
       },
       relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
@@ -424,14 +457,17 @@ describe('edge cases', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -447,9 +483,7 @@ describe('edge cases', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
@@ -459,14 +493,17 @@ describe('edge cases', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       // b1 is referenced in relation but NOT in entity map
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'nonexistent' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'nonexistent' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -483,13 +520,15 @@ describe('matchedIds instance targeting', () => {
         typeA: { rules: [] },
         typeB: {
           rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['c1'] } }] },
+            {
+              from: 'IDLE',
+              to: 'ACTIVE',
+              conditions: [{ fn: 'returns_ids', args: { ids: ['c1'] } }],
+            },
           ],
         },
         typeC: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [
@@ -511,10 +550,15 @@ describe('matchedIds instance targeting', () => {
       { name: 'b_c', sourceId: 'b1', targetId: 'c2' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -533,14 +577,10 @@ describe('matchedIds instance targeting', () => {
       machines: {
         typeA: { rules: [] },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeC: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [
@@ -561,10 +601,15 @@ describe('matchedIds instance targeting', () => {
       { name: 'b_c', sourceId: 'b1', targetId: 'c2' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -580,7 +625,11 @@ describe('matchedIds instance targeting', () => {
         typeA: { rules: [] },
         typeB: {
           rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['nonexistent'] } }] },
+            {
+              from: 'IDLE',
+              to: 'ACTIVE',
+              conditions: [{ fn: 'returns_ids', args: { ids: ['nonexistent'] } }],
+            },
           ],
         },
       },
@@ -592,14 +641,17 @@ describe('matchedIds instance targeting', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

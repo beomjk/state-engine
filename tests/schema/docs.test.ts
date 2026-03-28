@@ -258,6 +258,94 @@ describe('generateMermaid', () => {
   });
 });
 
+describe('generateDocs — relations', () => {
+  it('generates relations table', () => {
+    const d = createDefiner(presetNames).withArgs<BuiltinPresetArgsMap>();
+    const entityA = d.entity({ name: 'Experiment', statuses: ['A'] as const });
+    const entityB = d.entity({ name: 'Hypothesis', statuses: ['B'] as const });
+    d.relation({
+      name: 'tests',
+      source: 'experiment',
+      target: 'hypothesis',
+      metadata: { classification: 'conducts' },
+    });
+    const schema = defineSchema({
+      presetNames,
+      entities: { experiment: entityA, hypothesis: entityB },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+
+    expect(docs.relations).toContain('| Relation | Source | Target | Direction | Metadata |');
+    expect(docs.relations).toContain('| tests | experiment | hypothesis | default |');
+    expect(docs.relations).toContain('"classification":"conducts"');
+  });
+
+  it('direction defaults to "default" in output', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| default |');
+  });
+
+  it('shows reverse direction', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'depends', source: 'a', target: 'a', direction: 'reverse' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| reverse |');
+  });
+
+  it('shows em-dash for missing metadata', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| \u2014 |');
+  });
+
+  it('schema with no relations — empty relations table', () => {
+    const schema = makeSchema();
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toBe('');
+  });
+
+  it('relations included in default tables', () => {
+    const d = createDefiner(presetNames).withArgs<BuiltinPresetArgsMap>();
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema);
+    expect(docs).toHaveProperty('relations');
+    expect(docs.relations).toContain('| link |');
+  });
+});
+
 describe('scale test (SC-003)', () => {
   it('handles 5 entities with 20 transition rules', () => {
     const statuses = ['S1', 'S2', 'S3', 'S4', 'S5'] as const;

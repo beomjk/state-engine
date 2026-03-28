@@ -23,19 +23,22 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [],
     });
 
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
-    const result = orchestrator.execute(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -46,19 +49,22 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [],
     });
 
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
-    const result = orchestrator.execute(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -74,14 +80,10 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
@@ -91,14 +93,17 @@ describe('execute()', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.execute(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -112,19 +117,22 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [],
     });
 
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
-    const result = orchestrator.execute(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -141,9 +149,7 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeB: {
           rules: [
@@ -159,14 +165,17 @@ describe('execute()', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
 
-    const result = orchestrator.execute(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -178,7 +187,11 @@ describe('execute()', () => {
       machines: {
         typeA: {
           rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'field_equals', args: { field: 'ready', value: true } }] },
+            {
+              from: 'IDLE',
+              to: 'ACTIVE',
+              conditions: [{ fn: 'field_equals', args: { field: 'ready', value: true } }],
+            },
           ],
         },
       },
@@ -187,10 +200,15 @@ describe('execute()', () => {
 
     // ready is false, so IDLE->ACTIVE won't be valid
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE', { ready: false }));
-    const result = orchestrator.execute(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -207,10 +225,15 @@ describe('execute()', () => {
       relations: [],
     });
 
-    const result = orchestrator.execute(new Map(), [], {}, {
-      entityId: 'missing',
-      targetStatus: 'X',
-    });
+    const result = orchestrator.execute(
+      new Map(),
+      [],
+      {},
+      {
+        entityId: 'missing',
+        targetStatus: 'X',
+      },
+    );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -224,14 +247,10 @@ describe('execute()', () => {
     const orchestrator = buildOrchestrator({
       machines: {
         typeA: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
         typeB: {
-          rules: [
-            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-          ],
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
         },
       },
       relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
@@ -241,9 +260,7 @@ describe('execute()', () => {
       makeEntity('a1', 'typeA', 'IDLE'),
       makeEntity('b1', 'typeB', 'IDLE'),
     );
-    const rels: RelationInstance[] = [
-      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
-    ];
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
     const trigger = { entityId: 'a1', targetStatus: 'ACTIVE' };
 
     const simResult = orchestrator.simulate(entities, rels, {}, trigger);
@@ -277,10 +294,15 @@ describe('execute()', () => {
     });
 
     const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
-    const result = orchestrator.execute(entities, [], {}, {
-      entityId: 'a1',
-      targetStatus: 'DONE',
-    });
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'DONE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

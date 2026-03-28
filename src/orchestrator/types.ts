@@ -1,9 +1,4 @@
-import type {
-  Entity,
-  Engine,
-  TransitionRule,
-  ManualTransition,
-} from '../engine/types.js';
+import type { Entity, Engine, TransitionRule, ManualTransition } from '../engine/types.js';
 
 // Re-export for convenience
 export type { Entity };

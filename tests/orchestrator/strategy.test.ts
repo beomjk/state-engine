@@ -29,19 +29,20 @@ describe('propagation strategy', () => {
   const machines = {
     typeA: { rules: [] },
     typeB: {
-      rules: [
-        { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-      ],
+      rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
     },
     typeC: {
-      rules: [
-        { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
-      ],
+      rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
     },
   };
 
   const relations: RelationDefinition[] = [
-    { name: 'conducts', source: 'typeA', target: 'typeB', metadata: { classification: 'conducts' } },
+    {
+      name: 'conducts',
+      source: 'typeA',
+      target: 'typeB',
+      metadata: { classification: 'conducts' },
+    },
     { name: 'blocks', source: 'typeA', target: 'typeC', metadata: { classification: 'blocks' } },
   ];
 
@@ -54,14 +55,24 @@ describe('propagation strategy', () => {
       makeEntity('c1', 'typeC', 'IDLE'),
     );
     const rels: RelationInstance[] = [
-      { name: 'conducts', sourceId: 'a1', targetId: 'b1', metadata: { classification: 'conducts' } },
+      {
+        name: 'conducts',
+        sourceId: 'a1',
+        targetId: 'b1',
+        metadata: { classification: 'conducts' },
+      },
       { name: 'blocks', sourceId: 'a1', targetId: 'c1', metadata: { classification: 'blocks' } },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -84,14 +95,24 @@ describe('propagation strategy', () => {
       makeEntity('c1', 'typeC', 'IDLE'),
     );
     const rels: RelationInstance[] = [
-      { name: 'conducts', sourceId: 'a1', targetId: 'b1', metadata: { classification: 'conducts' } },
+      {
+        name: 'conducts',
+        sourceId: 'a1',
+        targetId: 'b1',
+        metadata: { classification: 'conducts' },
+      },
       { name: 'blocks', sourceId: 'a1', targetId: 'c1', metadata: { classification: 'blocks' } },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -117,14 +138,24 @@ describe('propagation strategy', () => {
       makeEntity('c1', 'typeC', 'IDLE'),
     );
     const rels: RelationInstance[] = [
-      { name: 'conducts', sourceId: 'a1', targetId: 'b1', metadata: { classification: 'conducts' } },
+      {
+        name: 'conducts',
+        sourceId: 'a1',
+        targetId: 'b1',
+        metadata: { classification: 'conducts' },
+      },
       { name: 'blocks', sourceId: 'a1', targetId: 'c1', metadata: { classification: 'blocks' } },
     ];
 
-    orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     // Strategy should have been called for both relation instances
     expect(receivedArgs.length).toBeGreaterThanOrEqual(2);
@@ -155,14 +186,24 @@ describe('propagation strategy', () => {
       makeEntity('c1', 'typeC', 'IDLE'),
     );
     const rels: RelationInstance[] = [
-      { name: 'conducts', sourceId: 'a1', targetId: 'b1', metadata: { classification: 'conducts' } },
+      {
+        name: 'conducts',
+        sourceId: 'a1',
+        targetId: 'b1',
+        metadata: { classification: 'conducts' },
+      },
       { name: 'blocks', sourceId: 'a1', targetId: 'c1', metadata: { classification: 'blocks' } },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -185,10 +226,15 @@ describe('propagation strategy', () => {
       { name: 'blocks', sourceId: 'a1', targetId: 'c1' },
     ];
 
-    const result = orchestrator.simulate(entities, rels, {}, {
-      entityId: 'a1',
-      targetStatus: 'ACTIVE',
-    });
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
