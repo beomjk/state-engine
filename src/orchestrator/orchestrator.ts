@@ -29,14 +29,48 @@ interface QueueEntry {
   round: number;
 }
 
+interface RelationIndex {
+  /** Key: "relationName:sourceId" */
+  bySource: Map<string, RelationInstance[]>;
+  /** Key: "relationName:targetId" */
+  byTarget: Map<string, RelationInstance[]>;
+}
+
+/** Build O(1)-lookup indexes from a flat relation instance array. Single O(R) pass. */
+function buildRelationIndex(relationInstances: RelationInstance[]): RelationIndex {
+  const bySource = new Map<string, RelationInstance[]>();
+  const byTarget = new Map<string, RelationInstance[]>();
+
+  for (const ri of relationInstances) {
+    const srcKey = `${ri.name}:${ri.sourceId}`;
+    const tgtKey = `${ri.name}:${ri.targetId}`;
+
+    let srcList = bySource.get(srcKey);
+    if (!srcList) {
+      srcList = [];
+      bySource.set(srcKey, srcList);
+    }
+    srcList.push(ri);
+
+    let tgtList = byTarget.get(tgtKey);
+    if (!tgtList) {
+      tgtList = [];
+      byTarget.set(tgtKey, tgtList);
+    }
+    tgtList.push(ri);
+  }
+
+  return { bySource, byTarget };
+}
+
 /**
  * Find downstream entity IDs to re-evaluate after a state change.
- * Uses relation definitions for type-level matching and relation instances for instance-level targeting.
+ * Uses relation definitions for type-level matching and the pre-built index for instance-level targeting.
  */
 function findDownstream(
   change: StateChange,
   relationDefs: RelationDefinition[],
-  relationInstances: RelationInstance[],
+  relationIndex: RelationIndex,
   propagation: PropagationStrategy,
 ): string[] {
   const targetSet = new Set<string>();
@@ -45,31 +79,24 @@ function findDownstream(
     const direction = def.direction ?? 'default';
     let matchesSource: boolean;
     let getTargetId: (ri: RelationInstance) => string;
+    let instances: RelationInstance[];
 
     if (direction === 'default') {
       // source changes -> re-evaluate target
       matchesSource = def.source === change.entityType;
       getTargetId = (ri) => ri.targetId;
+      instances = relationIndex.bySource.get(`${def.name}:${change.entityId}`) ?? [];
     } else {
       // reverse: target changes -> re-evaluate source
       matchesSource = def.target === change.entityType;
       getTargetId = (ri) => ri.sourceId;
+      instances = relationIndex.byTarget.get(`${def.name}:${change.entityId}`) ?? [];
     }
 
     if (!matchesSource) continue;
 
-    // Find concrete instances for this relation definition
-    for (const ri of relationInstances) {
-      if (ri.name !== def.name) continue;
-
-      // Check if the changed entity is involved in this instance
-      const isChangedEntity =
-        direction === 'default' ? ri.sourceId === change.entityId : ri.targetId === change.entityId;
-      if (!isChangedEntity) continue;
-
-      // Apply propagation strategy
+    for (const ri of instances) {
       if (!propagation(change, ri)) continue;
-
       targetSet.add(getTargetId(ri));
     }
   }
@@ -105,6 +132,8 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
     maxDepth,
   } = config;
 
+  const relationIndex = buildRelationIndex(relationInstances);
+
   const steps: CascadeStep[] = [];
   const unresolved: UnresolvedEntity[] = [];
   const availableManualTransitions: AvailableManualTransition[] = [];
@@ -137,7 +166,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
   const initialDownstream = findDownstream(
     triggerChange,
     relationDefs,
-    relationInstances,
+    relationIndex,
     propagation,
   );
   for (const id of initialDownstream) {
@@ -154,8 +183,8 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
 
       if (entry.round > maxDepth) {
         converged = false;
-        // Put it back conceptually — we just stop processing
-        continue;
+        // All remaining entries have round >= entry.round (BFS monotonic), so stop.
+        break;
       }
 
       currentRound = Math.max(currentRound, entry.round);
@@ -215,12 +244,13 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
         // Apply to overlay
         overlay.set(entity.id, { ...entity, status: match.status });
 
+        if (!match.rule) continue;
+
         steps.push({
           ...change,
           round: entry.round,
           triggeredBy: entry.triggeredBy,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          rule: match.rule!,
+          rule: match.rule,
         });
 
         // Enqueue downstream — matchedIds targeting takes precedence over relation graph
@@ -230,7 +260,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
           downstream = match.matchedIds;
         } else {
           // Fallback: relation-instance-based propagation
-          downstream = findDownstream(change, relationDefs, relationInstances, propagation);
+          downstream = findDownstream(change, relationDefs, relationIndex, propagation);
         }
         for (const id of downstream) {
           enqueue(id, [entity.id], entry.round + 1);

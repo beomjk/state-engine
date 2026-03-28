@@ -8,6 +8,7 @@ import {
   fieldEquals,
   alwaysMet,
   throwingPreset,
+  throwingNonErrorPreset,
   returnsIds,
 } from './fixtures.js';
 
@@ -538,6 +539,42 @@ describe('edge cases', () => {
     if (result.error === 'cascade_error') {
       expect(result.partialTrace).toBeDefined();
       expect(result.partialTrace.trigger.entityId).toBe('a1');
+    }
+  });
+
+  it('non-Error throw — cascade_error with String(err) fallback', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'throw_non_error', args: {} }] },
+          ],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      presets: {
+        throw_non_error: throwingNonErrorPreset,
+      },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error === 'cascade_error') {
+      expect(result.partialTrace.error).toBe('raw string error');
+      expect(result.partialTrace.converged).toBe(false);
     }
   });
 

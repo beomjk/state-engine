@@ -43,6 +43,13 @@ export const throwingPreset = (): PresetResult => {
   throw new Error('Preset evaluation failed');
 };
 
+/**
+ * Preset that throws a raw string (for testing the String(err) fallback path).
+ */
+export const throwingNonErrorPreset = (): PresetResult => {
+  throw 'raw string error';
+};
+
 // --- Entity builders ---
 
 export function buildEntityMap(...entities: Entity[]): Map<string, Entity> {

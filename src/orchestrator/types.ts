@@ -18,7 +18,7 @@ export interface StateChange {
  * One step in a cascade trace, extending StateChange with causal information.
  */
 export interface CascadeStep extends StateChange {
-  /** BFS iteration round (0 = trigger, 1 = first cascade wave, etc.) */
+  /** BFS iteration round (1 = first cascade wave, 2 = second, etc.). The trigger is stored separately in CascadeTrace.trigger. */
   round: number;
   /** Entity IDs whose changes caused this re-evaluation */
   triggeredBy: string[];

@@ -20,6 +20,9 @@ function formatCondition(c: { fn: string; args: Record<string, unknown> }): stri
 /**
  * Generate Markdown table strings from a schema definition.
  * Returns a record of table name → markdown string.
+ *
+ * When `options.tables` is omitted, all four tables are generated
+ * (statuses, transitions, manual-transitions, relations).
  */
 export function generateDocs(
   schema: SchemaDefinition<readonly string[]>,
