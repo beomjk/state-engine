@@ -21,6 +21,7 @@ export {
   defineEntity,
   defineSchema,
   DuplicateRelationError,
+  extractMachines,
   extractManualTransitions,
   extractRelations,
   extractRules,

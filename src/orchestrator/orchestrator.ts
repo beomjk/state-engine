@@ -248,10 +248,12 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
           to: match.status,
         };
 
+        // Guard narrows match.rule to non-null (guaranteed by autoTransitions filter
+        // at line 208, but kept for type narrowing and defensive safety).
+        if (!match.rule) continue;
+
         // Apply to overlay
         overlay.set(entity.id, { ...entity, status: match.status });
-
-        if (!match.rule) continue;
 
         steps.push({
           ...change,

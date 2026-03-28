@@ -6,8 +6,12 @@ import {
   createEngine,
   defineEntity,
   defineSchema,
+  extractMachines,
+  extractRelations,
   extractRules,
   extractManualTransitions,
+  DuplicateRelationError,
+  InvalidRelationEntityError,
   generateDocs,
   generateMermaid,
   updateDocContent,
@@ -50,8 +54,12 @@ describe('entry point imports', () => {
     expect(createEngine).toBeTypeOf('function');
     expect(defineEntity).toBeTypeOf('function');
     expect(defineSchema).toBeTypeOf('function');
+    expect(extractMachines).toBeTypeOf('function');
+    expect(extractRelations).toBeTypeOf('function');
     expect(extractRules).toBeTypeOf('function');
     expect(extractManualTransitions).toBeTypeOf('function');
+    expect(DuplicateRelationError).toBeTypeOf('function');
+    expect(InvalidRelationEntityError).toBeTypeOf('function');
     expect(generateDocs).toBeTypeOf('function');
     expect(generateMermaid).toBeTypeOf('function');
     expect(updateDocContent).toBeTypeOf('function');

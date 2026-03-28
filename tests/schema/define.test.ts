@@ -6,6 +6,7 @@ import {
   extractRules,
   extractManualTransitions,
   extractRelations,
+  extractMachines,
 } from '../../src/schema/define.js';
 import type { BuiltinPresetArgsMap } from '../../src/presets/builtins.js';
 
@@ -130,6 +131,36 @@ describe('createDefiner / defineSchema', () => {
     });
 
     expect(extractManualTransitions(def)).toEqual([]);
+  });
+
+  it('extractMachines builds machines config from schema', () => {
+    const entityA = define.entity({
+      name: 'TypeA',
+      statuses: ['IDLE', 'ACTIVE'] as const,
+      transitions: [
+        { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'field_present', args: { name: 'x' } }] },
+      ],
+      manualTransitions: [{ from: 'ACTIVE', to: 'IDLE' }],
+    });
+    const entityB = define.entity({
+      name: 'TypeB',
+      statuses: ['OFF', 'ON'] as const,
+    });
+
+    const schema = defineSchema({
+      presetNames: ['field_present', 'field_equals'] as const,
+      entities: { a: entityA, b: entityB },
+    });
+
+    const machines = extractMachines(schema);
+
+    expect(Object.keys(machines)).toEqual(['TypeA', 'TypeB']);
+    expect(machines['TypeA'].rules).toHaveLength(1);
+    expect(machines['TypeA'].rules[0].from).toBe('IDLE');
+    expect(machines['TypeA'].rules[0].to).toBe('ACTIVE');
+    expect(machines['TypeA'].manualTransitions).toEqual([{ from: 'ACTIVE', to: 'IDLE' }]);
+    expect(machines['TypeB'].rules).toEqual([]);
+    expect(machines['TypeB'].manualTransitions).toEqual([]);
   });
 
   it('legacy defineEntity still works (deprecated)', () => {

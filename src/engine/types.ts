@@ -14,7 +14,12 @@ export interface Entity {
  */
 export interface PresetResult {
   met: boolean;
-  /** IDs of related entities that satisfied the condition (for debugging/transparency). */
+  /**
+   * IDs of related entities that satisfied the condition.
+   * Used for debugging/transparency at engine level.
+   * When used with the orchestrator, non-empty matchedIds bypass relation-based
+   * propagation and directly target these entities for cascade re-evaluation.
+   */
   matchedIds: string[];
 }
 

@@ -253,3 +253,23 @@ export function extractManualTransitions(
     to: mt.to,
   }));
 }
+
+/**
+ * Extract machines config from a schema for use with createOrchestrator().
+ * Keys are entity definition names (matching Entity.type at runtime).
+ */
+export function extractMachines(
+  schema: SchemaDefinition<readonly string[]>,
+): Record<string, { rules: TransitionRule[]; manualTransitions: ManualTransition[] }> {
+  const result: Record<
+    string,
+    { rules: TransitionRule[]; manualTransitions: ManualTransition[] }
+  > = {};
+  for (const [, entity] of Object.entries(schema.entities)) {
+    result[entity.name] = {
+      rules: extractRules(entity),
+      manualTransitions: extractManualTransitions(entity),
+    };
+  }
+  return result;
+}
