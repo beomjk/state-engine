@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import { createOrchestrator } from '../../src/orchestrator/orchestrator.js';
 import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
-import { buildEntityMap, makeEntity, fieldEquals, alwaysMet, throwingPreset } from './fixtures.js';
+import { buildEntityMap, makeEntity, fieldEquals, alwaysMet, throwingPreset, returnsIds } from './fixtures.js';
 
 /**
  * Helper to build an orchestrator with custom machines and relations.
@@ -471,6 +471,140 @@ describe('edge cases', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // Should complete without error, just skip the missing entity
+    expect(result.trace.converged).toBe(true);
+  });
+});
+
+describe('matchedIds instance targeting', () => {
+  it('preset returns specific matchedIds — only those entities re-evaluated downstream', () => {
+    // A triggers → B evaluated with returns_ids=['c1'] → only c1 re-evaluated (not c2)
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['c1'] } }] },
+          ],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      presets: { returns_ids: returnsIds },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+      makeEntity('c2', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c2' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // b1 transitions (matchedIds=['c1']), so only c1 should be re-evaluated
+    const steppedIds = result.trace.steps.map((s) => s.entityId);
+    expect(steppedIds).toContain('b1');
+    expect(steppedIds).toContain('c1');
+    expect(steppedIds).not.toContain('c2');
+    expect(result.trace.finalStates.get('c1')).toBe('ACTIVE');
+    expect(result.trace.finalStates.get('c2')).toBe('IDLE');
+  });
+
+  it('empty matchedIds falls back to relation-based propagation', () => {
+    // B's rule returns matchedIds=[] → fall back to all relation instances for downstream
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+      makeEntity('c2', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c2' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Both c1 and c2 should be re-evaluated (relation-based fallback)
+    expect(result.trace.steps).toHaveLength(3); // b1 + c1 + c2
+    expect(result.trace.finalStates.get('c1')).toBe('ACTIVE');
+    expect(result.trace.finalStates.get('c2')).toBe('ACTIVE');
+  });
+
+  it('matchedIds pointing to entity not in entity map — skip gracefully', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['nonexistent'] } }] },
+          ],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      presets: { returns_ids: returnsIds },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // b1 transitions with matchedIds=['nonexistent'] — nonexistent is enqueued but skipped
+    expect(result.trace.steps).toHaveLength(1); // only b1
     expect(result.trace.converged).toBe(true);
   });
 });

@@ -177,8 +177,15 @@ function runCascade<TContext>(
         rule: match.rule as TransitionRule,
       });
 
-      // Enqueue downstream
-      const downstream = findDownstream(change, relationDefs, relationInstances, propagation);
+      // Enqueue downstream — matchedIds targeting takes precedence
+      let downstream: string[];
+      if (match.matchedIds.length > 0) {
+        // Instance-level targeting: only re-evaluate entities referenced by matchedIds
+        downstream = match.matchedIds;
+      } else {
+        // Fallback: relation-instance-based propagation
+        downstream = findDownstream(change, relationDefs, relationInstances, propagation);
+      }
       for (const id of downstream) {
         queue.push({
           entityId: id,
