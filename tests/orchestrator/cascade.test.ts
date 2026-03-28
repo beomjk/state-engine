@@ -137,6 +137,11 @@ describe('cascade behavior', () => {
     expect(result.trace.affected).toContain('b1');
     expect(result.trace.affected).toContain('c1');
     expect(result.trace.affected).toContain('d1');
+    // D should be triggered by both B and C (merged triggeredBy)
+    const dStep = result.trace.steps.find((s) => s.entityId === 'd1');
+    expect(dStep).toBeDefined();
+    expect(dStep!.triggeredBy).toContain('b1');
+    expect(dStep!.triggeredBy).toContain('c1');
   });
 
   it('cycle terminates within maxDepth', () => {
@@ -186,6 +191,9 @@ describe('cascade behavior', () => {
     if (!result.ok) return;
     // Should have terminated, not infinite loop
     expect(result.trace.rounds).toBeLessThanOrEqual(5);
+    // Oscillating cascade must report non-convergence
+    expect(result.trace.converged).toBe(false);
+    expect(result.trace.steps.length).toBeGreaterThan(0);
   });
 
   it('converged flag is true when cascade reaches fixed point', () => {
@@ -802,5 +810,59 @@ describe('additional edge cases', () => {
     if (!result.ok) return;
     expect(result.trace.steps).toHaveLength(0);
     expect(result.trace.converged).toBe(true);
+  });
+
+  it('context is passed through to engine during cascade evaluation', () => {
+    // Preset that reads from context to decide transition
+    const contextAware = (
+      _entity: Parameters<typeof alwaysMet>[0],
+      context: { threshold: number },
+      args: Record<string, unknown>,
+    ) => ({
+      met: context.threshold >= (args.min as number),
+      matchedIds: [] as string[],
+    });
+
+    const engine = createEngine<{ threshold: number }>({
+      presets: { context_check: contextAware },
+    });
+    const orchestrator = createOrchestrator<{ threshold: number }>({
+      engine,
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'context_check', args: { min: 5 } }] },
+          ],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    // Context threshold too low — b1 should NOT transition
+    const lowResult = orchestrator.simulate(entities, rels, { threshold: 3 }, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+    expect(lowResult.ok).toBe(true);
+    if (!lowResult.ok) return;
+    expect(lowResult.trace.steps).toHaveLength(0);
+
+    // Context threshold met — b1 should transition
+    const highResult = orchestrator.simulate(entities, rels, { threshold: 10 }, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+    expect(highResult.ok).toBe(true);
+    if (!highResult.ok) return;
+    expect(highResult.trace.steps).toHaveLength(1);
+    expect(highResult.trace.steps[0].entityId).toBe('b1');
+    expect(highResult.trace.steps[0].to).toBe('ACTIVE');
   });
 });
