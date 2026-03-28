@@ -111,25 +111,26 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
   const affected = new Set<string>();
   const reportedManualTransitions = new Set<string>();
 
-  // Deduplication: prevent same entity from being evaluated twice in the same round
+  // Deduplication: prevent same entity from being evaluated twice in the same round.
+  // entryMap provides O(1) lookup for triggeredBy merging (avoids linear queue scan).
   const queue: QueueEntry[] = [];
-  const enqueued = new Set<string>();
+  const entryMap = new Map<string, QueueEntry>();
+  let head = 0; // cursor index — avoids O(n) Array.shift()
 
   function enqueue(entityId: string, triggeredBy: string[], round: number): void {
     const key = `${entityId}:${round}`;
-    if (enqueued.has(key)) {
-      const existing = queue.find((e) => e.entityId === entityId && e.round === round);
-      if (existing) {
-        for (const id of triggeredBy) {
-          if (!existing.triggeredBy.includes(id)) {
-            existing.triggeredBy.push(id);
-          }
+    const existing = entryMap.get(key);
+    if (existing) {
+      for (const id of triggeredBy) {
+        if (!existing.triggeredBy.includes(id)) {
+          existing.triggeredBy.push(id);
         }
       }
       return;
     }
-    enqueued.add(key);
-    queue.push({ entityId, triggeredBy: [...triggeredBy], round });
+    const entry: QueueEntry = { entityId, triggeredBy: [...triggeredBy], round };
+    entryMap.set(key, entry);
+    queue.push(entry);
   }
 
   // Seed the queue with downstream of the trigger
@@ -148,9 +149,8 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
   let cascadeError: string | undefined;
 
   try {
-    while (queue.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const entry = queue.shift()!;
+    while (head < queue.length) {
+      const entry = queue[head++];
 
       if (entry.round > maxDepth) {
         converged = false;
