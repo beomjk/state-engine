@@ -39,7 +39,7 @@ function findDownstream(
   relationInstances: RelationInstance[],
   propagation: PropagationStrategy,
 ): string[] {
-  const targets: string[] = [];
+  const targetSet = new Set<string>();
 
   for (const def of relationDefs) {
     const direction = def.direction ?? 'default';
@@ -70,34 +70,67 @@ function findDownstream(
       // Apply propagation strategy
       if (!propagation(change, ri)) continue;
 
-      const targetId = getTargetId(ri);
-      if (!targets.includes(targetId)) {
-        targets.push(targetId);
-      }
+      targetSet.add(getTargetId(ri));
     }
   }
 
-  return targets;
+  return [...targetSet];
+}
+
+interface CascadeConfig<TContext> {
+  overlay: StateOverlay;
+  relationInstances: RelationInstance[];
+  relationDefs: RelationDefinition[];
+  context: TContext;
+  triggerChange: StateChange;
+  machines: Record<string, { rules: TransitionRule[]; manualTransitions?: ManualTransition[] }>;
+  engine: Engine<TContext>;
+  propagation: PropagationStrategy;
+  maxDepth: number;
 }
 
 /**
  * Run BFS cascade from a trigger state change.
  */
-function runCascade<TContext>(
-  overlay: StateOverlay,
-  relationInstances: RelationInstance[],
-  relationDefs: RelationDefinition[],
-  context: TContext,
-  triggerChange: StateChange,
-  machines: Record<string, { rules: TransitionRule[]; manualTransitions?: ManualTransition[] }>,
-  engine: Engine<TContext>,
-  propagation: PropagationStrategy,
-  maxDepth: number,
-): CascadeTrace {
+function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
+  const {
+    overlay,
+    relationInstances,
+    relationDefs,
+    context,
+    triggerChange,
+    machines,
+    engine,
+    propagation,
+    maxDepth,
+  } = config;
+
   const steps: CascadeStep[] = [];
   const unresolved: UnresolvedEntity[] = [];
   const availableManualTransitions: AvailableManualTransition[] = [];
   const affected = new Set<string>();
+  const reportedManualTransitions = new Set<string>();
+
+  // Deduplication: prevent same entity from being evaluated twice in the same round
+  const queue: QueueEntry[] = [];
+  const enqueued = new Set<string>();
+
+  function enqueue(entityId: string, triggeredBy: string[], round: number): void {
+    const key = `${entityId}:${round}`;
+    if (enqueued.has(key)) {
+      const existing = queue.find((e) => e.entityId === entityId && e.round === round);
+      if (existing) {
+        for (const id of triggeredBy) {
+          if (!existing.triggeredBy.includes(id)) {
+            existing.triggeredBy.push(id);
+          }
+        }
+      }
+      return;
+    }
+    enqueued.add(key);
+    queue.push({ entityId, triggeredBy: [...triggeredBy], round });
+  }
 
   // Seed the queue with downstream of the trigger
   const initialDownstream = findDownstream(
@@ -106,116 +139,120 @@ function runCascade<TContext>(
     relationInstances,
     propagation,
   );
-  const queue: QueueEntry[] = initialDownstream.map((id) => ({
-    entityId: id,
-    triggeredBy: [triggerChange.entityId],
-    round: 1,
-  }));
+  for (const id of initialDownstream) {
+    enqueue(id, [triggerChange.entityId], 1);
+  }
 
   let currentRound = 0;
   let converged = true;
+  let cascadeError: string | undefined;
 
-  while (queue.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const entry = queue.shift()!;
+  try {
+    while (queue.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const entry = queue.shift()!;
 
-    if (entry.round > maxDepth) {
-      converged = false;
-      // Put it back conceptually — we just stop processing
-      continue;
-    }
-
-    currentRound = Math.max(currentRound, entry.round);
-
-    const entity = overlay.get(entry.entityId);
-    if (!entity) continue; // Missing entity — skip gracefully
-
-    affected.add(entry.entityId);
-
-    const machine = machines[entity.type];
-    if (!machine) continue; // No machine for this entity type
-
-    const validTransitions = engine.getValidTransitions(
-      entity,
-      context,
-      machine.rules,
-      machine.manualTransitions,
-    );
-
-    // Separate auto and manual transitions
-    const autoTransitions = validTransitions.filter((vt) => vt.rule !== null);
-    const manualTransitions = validTransitions.filter((vt) => vt.rule === null);
-
-    // Report new manual transitions
-    for (const mt of manualTransitions) {
-      availableManualTransitions.push({
-        entityId: entity.id,
-        entityType: entity.type,
-        from: entity.status,
-        to: mt.status,
-      });
-    }
-
-    // Deduplicate auto transitions by target status
-    const uniqueAutoTargets = new Map<string, ValidTransition>();
-    for (const at of autoTransitions) {
-      if (!uniqueAutoTargets.has(at.status)) {
-        uniqueAutoTargets.set(at.status, at);
+      if (entry.round > maxDepth) {
+        converged = false;
+        // Put it back conceptually — we just stop processing
+        continue;
       }
-    }
 
-    const uniqueAutos = [...uniqueAutoTargets.values()];
+      currentRound = Math.max(currentRound, entry.round);
 
-    if (uniqueAutos.length === 1) {
-      // Single match — apply
-      const match = uniqueAutos[0];
-      const change: StateChange = {
-        entityId: entity.id,
-        entityType: entity.type,
-        from: entity.status,
-        to: match.status,
-      };
+      const entity = overlay.get(entry.entityId);
+      if (!entity) continue; // Missing entity — skip gracefully
 
-      // Apply to overlay
-      overlay.set(entity.id, { ...entity, status: match.status });
+      affected.add(entry.entityId);
 
-      steps.push({
-        ...change,
-        round: entry.round,
-        triggeredBy: entry.triggeredBy,
-        rule: match.rule as TransitionRule,
-      });
+      const machine = machines[entity.type];
+      if (!machine) continue; // No machine for this entity type
 
-      // Enqueue downstream — matchedIds targeting takes precedence
-      let downstream: string[];
-      if (match.matchedIds.length > 0) {
-        // Instance-level targeting: only re-evaluate entities referenced by matchedIds
-        downstream = match.matchedIds;
-      } else {
-        // Fallback: relation-instance-based propagation
-        downstream = findDownstream(change, relationDefs, relationInstances, propagation);
-      }
-      for (const id of downstream) {
-        queue.push({
-          entityId: id,
-          triggeredBy: [entity.id],
-          round: entry.round + 1,
+      const validTransitions = engine.getValidTransitions(
+        entity,
+        context,
+        machine.rules,
+        machine.manualTransitions,
+      );
+
+      // Separate auto and manual transitions
+      const autoTransitions = validTransitions.filter((vt) => vt.rule !== null);
+      const manualTransitions = validTransitions.filter((vt) => vt.rule === null);
+
+      // Report new manual transitions (deduplicate across re-evaluations)
+      for (const mt of manualTransitions) {
+        const mtKey = `${entity.id}:${mt.status}`;
+        if (reportedManualTransitions.has(mtKey)) continue;
+        reportedManualTransitions.add(mtKey);
+        availableManualTransitions.push({
+          entityId: entity.id,
+          entityType: entity.type,
+          from: entity.status,
+          to: mt.status,
         });
       }
-    } else if (uniqueAutos.length > 1) {
-      // Multi match — conflict
-      unresolved.push({
-        entityId: entity.id,
-        entityType: entity.type,
-        currentStatus: entity.status,
-        conflictingTargets: uniqueAutos.map((a) => a.status),
-        round: entry.round,
-      });
 
-      // Unresolved entity didn't transition — explore downstream with pre-cascade state
-      // (per research.md Decision 5: use current/pre-cascade state)
+      // Deduplicate auto transitions by target status
+      const uniqueAutoTargets = new Map<string, ValidTransition>();
+      for (const at of autoTransitions) {
+        if (!uniqueAutoTargets.has(at.status)) {
+          uniqueAutoTargets.set(at.status, at);
+        }
+      }
+
+      const uniqueAutos = [...uniqueAutoTargets.values()];
+
+      if (uniqueAutos.length === 1) {
+        // Single match — apply
+        const match = uniqueAutos[0];
+        const change: StateChange = {
+          entityId: entity.id,
+          entityType: entity.type,
+          from: entity.status,
+          to: match.status,
+        };
+
+        // Apply to overlay
+        overlay.set(entity.id, { ...entity, status: match.status });
+
+        steps.push({
+          ...change,
+          round: entry.round,
+          triggeredBy: entry.triggeredBy,
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          rule: match.rule!,
+        });
+
+        // Enqueue downstream — matchedIds targeting takes precedence over relation graph
+        // and bypasses PropagationStrategy (by design: instance-level targeting overrides type-level filtering)
+        let downstream: string[];
+        if (match.matchedIds.length > 0) {
+          downstream = match.matchedIds;
+        } else {
+          // Fallback: relation-instance-based propagation
+          downstream = findDownstream(change, relationDefs, relationInstances, propagation);
+        }
+        for (const id of downstream) {
+          enqueue(id, [entity.id], entry.round + 1);
+        }
+      } else if (uniqueAutos.length > 1) {
+        // Multi match — conflict
+        unresolved.push({
+          entityId: entity.id,
+          entityType: entity.type,
+          currentStatus: entity.status,
+          conflictingTargets: uniqueAutos.map((a) => a.status),
+          round: entry.round,
+        });
+
+        // Unresolved entity didn't transition — explore downstream with pre-cascade state
+        // (per research.md Decision 5: use current/pre-cascade state)
+      }
+      // No match — skip silently
     }
-    // No match — skip silently
+  } catch (err: unknown) {
+    converged = false;
+    cascadeError = err instanceof Error ? err.message : String(err);
   }
 
   return {
@@ -227,6 +264,7 @@ function runCascade<TContext>(
     finalStates: overlay.snapshot(),
     converged,
     rounds: currentRound,
+    ...(cascadeError !== undefined && { error: cascadeError }),
   };
 }
 
@@ -266,33 +304,22 @@ export function createOrchestrator<TContext>(
     };
     overlay.set(entity.id, { ...entity, status: trigger.targetStatus });
 
-    try {
-      const trace = runCascade(
-        overlay,
-        relations,
-        relationDefs,
-        context,
-        triggerChange,
-        machines,
-        engine,
-        propagation,
-        maxCascadeDepth,
-      );
-      return { ok: true, trace };
-    } catch {
-      // Preset threw during cascade — return partial trace
-      const partialTrace: CascadeTrace = {
-        trigger: triggerChange,
-        steps: [],
-        unresolved: [],
-        availableManualTransitions: [],
-        affected: [],
-        finalStates: overlay.snapshot(),
-        converged: false,
-        rounds: 0,
-      };
-      return { ok: false, error: 'cascade_error', partialTrace };
+    const trace = runCascade({
+      overlay,
+      relationInstances: relations,
+      relationDefs,
+      context,
+      triggerChange,
+      machines,
+      engine,
+      propagation,
+      maxDepth: maxCascadeDepth,
+    });
+
+    if (trace.error) {
+      return { ok: false, error: 'cascade_error', partialTrace: trace };
     }
+    return { ok: true, trace };
   }
 
   function execute(
@@ -338,39 +365,29 @@ export function createOrchestrator<TContext>(
     };
     overlay.set(entity.id, { ...entity, status: trigger.targetStatus });
 
-    try {
-      const trace = runCascade(
-        overlay,
-        relations,
-        relationDefs,
-        context,
-        triggerChange,
-        machines,
-        engine,
-        propagation,
-        maxCascadeDepth,
-      );
+    const trace = runCascade({
+      overlay,
+      relationInstances: relations,
+      relationDefs,
+      context,
+      triggerChange,
+      machines,
+      engine,
+      propagation,
+      maxDepth: maxCascadeDepth,
+    });
 
-      const changeset: Changeset = {
-        changes: [triggerChange, ...trace.steps],
-        trace,
-        unresolved: trace.unresolved,
-      };
-
-      return { ok: true, changeset };
-    } catch {
-      const partialTrace: CascadeTrace = {
-        trigger: triggerChange,
-        steps: [],
-        unresolved: [],
-        availableManualTransitions: [],
-        affected: [],
-        finalStates: overlay.snapshot(),
-        converged: false,
-        rounds: 0,
-      };
-      return { ok: false, error: 'cascade_error', partialTrace };
+    if (trace.error) {
+      return { ok: false, error: 'cascade_error', partialTrace: trace };
     }
+
+    const changeset: Changeset = {
+      changes: [triggerChange, ...trace.steps],
+      trace,
+      unresolved: trace.unresolved,
+    };
+
+    return { ok: true, changeset };
   }
 
   return { simulate, execute };

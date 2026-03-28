@@ -167,6 +167,34 @@ export function defineSchema<const TPresetNames extends readonly string[]>(
 }
 
 /**
+ * Thrown when a schema defines two relations with the same name.
+ */
+export class DuplicateRelationError extends Error {
+  constructor(public readonly relationName: string) {
+    super(`Duplicate relation name: "${relationName}"`);
+    this.name = 'DuplicateRelationError';
+  }
+}
+
+/**
+ * Thrown when a relation references an entity type not defined in the schema.
+ */
+export class InvalidRelationEntityError extends Error {
+  constructor(
+    public readonly relationName: string,
+    public readonly invalidEntity: string,
+    public readonly role: 'source' | 'target',
+    public readonly availableEntities: string[],
+  ) {
+    super(
+      `Relation "${relationName}" references invalid ${role} entity type: "${invalidEntity}". ` +
+        `Available: ${availableEntities.join(', ')}`,
+    );
+    this.name = 'InvalidRelationEntityError';
+  }
+}
+
+/**
  * Extract RelationDefinition[] from a schema, with validation.
  * Returns [] when schema.relations is undefined or empty.
  */
@@ -180,21 +208,15 @@ export function extractRelations(
 
   for (const rel of schema.relations) {
     if (seen.has(rel.name)) {
-      throw new Error(`Duplicate relation name: "${rel.name}"`);
+      throw new DuplicateRelationError(rel.name);
     }
     seen.add(rel.name);
 
     if (!entityKeys.includes(rel.source)) {
-      throw new Error(
-        `Relation "${rel.name}" references invalid source entity type: "${rel.source}". ` +
-          `Available: ${entityKeys.join(', ')}`,
-      );
+      throw new InvalidRelationEntityError(rel.name, rel.source, 'source', entityKeys);
     }
     if (!entityKeys.includes(rel.target)) {
-      throw new Error(
-        `Relation "${rel.name}" references invalid target entity type: "${rel.target}". ` +
-          `Available: ${entityKeys.join(', ')}`,
-      );
+      throw new InvalidRelationEntityError(rel.name, rel.target, 'target', entityKeys);
     }
   }
 

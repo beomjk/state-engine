@@ -1,7 +1,8 @@
 import type { Entity, Engine, TransitionRule, ManualTransition } from '../engine/types.js';
+import type { RelationDefinition, RelationInstance } from '../schema/define.js';
 
-// Re-export for convenience
-export type { Entity };
+// Re-export schema-canonical relation types for orchestrator consumers
+export type { RelationDefinition, RelationInstance };
 
 /**
  * A single state transition event.
@@ -65,17 +66,19 @@ export interface CascadeTrace {
   affected: string[];
   /** Entity ID -> final status (overlay result) */
   finalStates: ReadonlyMap<string, string>;
-  /** True if cascade reached fixed point; false if iteration cap hit */
+  /** True if cascade reached a fixed point (queue drained normally); false if maxDepth exceeded or error occurred */
   converged: boolean;
-  /** Total BFS rounds executed */
+  /** Highest BFS round reached (0 = no cascade steps executed, 1+ = cascade rounds) */
   rounds: number;
+  /** Error message if cascade terminated with an exception */
+  error?: string;
 }
 
 /**
  * Result of execute(). Wraps a CascadeTrace with application semantics.
  */
 export interface Changeset {
-  /** Ordered list of state changes to apply */
+  /** Ordered: first element is the trigger (StateChange), rest are cascade steps (CascadeStep extends StateChange) */
   changes: StateChange[];
   /** Full cascade trace for auditability */
   trace: CascadeTrace;
@@ -109,27 +112,6 @@ export type PropagationStrategy = (change: StateChange, relation: RelationInstan
  * Default strategy: propagate across all relations.
  */
 export const propagateAll: PropagationStrategy = () => true;
-
-/**
- * Relation definition — declared in schema, describes a named connection between entity types.
- */
-export interface RelationDefinition {
-  name: string;
-  source: string;
-  target: string;
-  direction?: 'default' | 'reverse';
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Runtime relation between two entity instances.
- */
-export interface RelationInstance {
-  name: string;
-  sourceId: string;
-  targetId: string;
-  metadata?: Record<string, unknown>;
-}
 
 /**
  * Configuration for createOrchestrator().

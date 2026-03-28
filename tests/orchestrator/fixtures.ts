@@ -1,5 +1,4 @@
-import type { Entity, TransitionRule, ManualTransition, PresetResult } from '../../src/engine/types.js';
-import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
+import type { Entity, PresetResult } from '../../src/engine/types.js';
 
 // --- Preset helpers ---
 
@@ -57,53 +56,4 @@ export function makeEntity(
   meta: Record<string, unknown> = {},
 ): Entity {
   return { id, type, status, meta };
-}
-
-// --- Sample entity definitions ---
-
-export const hypothesisRules: TransitionRule[] = [
-  {
-    from: 'PROPOSED',
-    to: 'TESTING',
-    conditions: [{ fn: 'field_equals', args: { field: 'hasExperiment', value: true } }],
-  },
-  {
-    from: 'TESTING',
-    to: 'SUPPORTED',
-    conditions: [{ fn: 'field_equals', args: { field: 'allCompleted', value: true } }],
-  },
-];
-
-export const hypothesisManual: ManualTransition[] = [
-  { from: 'TESTING', to: 'RETRACTED' },
-];
-
-export const experimentRules: TransitionRule[] = [
-  {
-    from: 'DESIGNED',
-    to: 'RUNNING',
-    conditions: [{ fn: 'field_equals', args: { field: 'approved', value: true } }],
-  },
-];
-
-export const experimentManual: ManualTransition[] = [
-  { from: 'RUNNING', to: 'COMPLETED' },
-  { from: 'RUNNING', to: 'FAILED' },
-];
-
-// --- Sample relations ---
-
-export const sampleRelationDefs: RelationDefinition[] = [
-  {
-    name: 'tests',
-    source: 'experiment',
-    target: 'hypothesis',
-    // default direction: experiment changes -> re-evaluate hypothesis
-  },
-];
-
-export function buildRelationInstances(
-  ...instances: [name: string, sourceId: string, targetId: string][]
-): RelationInstance[] {
-  return instances.map(([name, sourceId, targetId]) => ({ name, sourceId, targetId }));
 }

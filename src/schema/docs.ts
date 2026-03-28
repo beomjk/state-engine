@@ -1,7 +1,11 @@
 import type { EntityDefinition, SchemaDefinition } from './define.js';
 
 export interface DocGeneratorOptions {
-  /** Which tables to generate. */
+  /**
+   * Which tables to generate.
+   * Available: 'statuses', 'transitions', 'manual-transitions', 'relations'.
+   * Defaults to all four when omitted.
+   */
   tables: ('statuses' | 'transitions' | 'manual-transitions' | 'relations')[];
 }
 
@@ -60,6 +64,7 @@ export function generateDocs(
       }
     }
 
+    // Relations are schema-level (not per-entity), so rendered outside the entity loop
     if (table === 'relations' && schema.relations?.length) {
       lines.push('| Relation | Source | Target | Direction | Metadata |');
       lines.push('|----------|--------|--------|-----------|----------|');

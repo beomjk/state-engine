@@ -2,9 +2,11 @@ export {
   createDefiner,
   defineEntity,
   defineSchema,
+  DuplicateRelationError,
   extractManualTransitions,
   extractRelations,
   extractRules,
+  InvalidRelationEntityError,
 } from './define.js';
 export type {
   Definer,

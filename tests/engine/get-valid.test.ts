@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
-import type {
-  Entity,
-  ManualTransition,
-  TransitionRule,
-  PresetFn,
-} from '../../src/engine/types.js';
+import type { Entity, ManualTransition, TransitionRule, PresetFn } from '../../src/engine/types.js';
 
 const alwaysMet: PresetFn<unknown> = (_e, _c, _a) => ({ met: true, matchedIds: ['m1'] });
 const neverMet: PresetFn<unknown> = (_e, _c, _a) => ({ met: false, matchedIds: [] });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import { createOrchestrator } from '../../src/orchestrator/orchestrator.js';
 import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
-import { buildEntityMap, makeEntity, fieldEquals, alwaysMet } from './fixtures.js';
+import { buildEntityMap, makeEntity, fieldEquals, alwaysMet, throwingPreset } from './fixtures.js';
 
 function buildOrchestrator(opts: {
   machines: Parameters<typeof createOrchestrator>[0]['machines'];
@@ -307,5 +307,76 @@ describe('execute()', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.changeset.changes[0].to).toBe('DONE');
+  });
+
+  it('cascade error in execute() returns partial trace with error message', () => {
+    const engine = createEngine<unknown>({
+      presets: { always_met: alwaysMet, throw_preset: throwingPreset },
+    });
+    const orchestrator = createOrchestrator<unknown>({
+      engine,
+      machines: {
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'throw_preset', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.execute(
+      entities,
+      rels,
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error === 'cascade_error') {
+      expect(result.partialTrace).toBeDefined();
+      expect(result.partialTrace.error).toBe('Preset evaluation failed');
+      expect(result.partialTrace.converged).toBe(false);
+    }
+  });
+
+  it('"No machine found" returns validation_failed', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        // No machine for typeA
+      },
+      relations: [],
+    });
+
+    const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
+    const result = orchestrator.execute(
+      entities,
+      [],
+      {},
+      {
+        entityId: 'a1',
+        targetStatus: 'ACTIVE',
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('validation_failed');
+    if (result.error === 'validation_failed') {
+      expect(result.reason).toContain('No machine found');
+      expect(result.reason).toContain('typeA');
+    }
   });
 });

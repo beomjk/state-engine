@@ -20,9 +20,11 @@ export {
   createDefiner,
   defineEntity,
   defineSchema,
+  DuplicateRelationError,
   extractManualTransitions,
   extractRelations,
   extractRules,
+  InvalidRelationEntityError,
 } from './schema/index.js';
 export type {
   Definer,
@@ -37,7 +39,7 @@ export { generateDocs, generateMermaid, updateDocContent } from './schema/index.
 export type { DocGeneratorOptions } from './schema/index.js';
 
 // Orchestrator
-export { createOrchestrator, propagateAll } from './orchestrator/index.js';
+export { createOrchestrator, propagateAll, StateOverlay } from './orchestrator/index.js';
 export type {
   CascadeStep,
   CascadeTrace,

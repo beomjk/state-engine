@@ -34,7 +34,7 @@ import {
 } from '../src/schema/index.js';
 
 // Entry point: @beomjk/state-engine/orchestrator
-import { createOrchestrator, propagateAll } from '../src/orchestrator/index.js';
+import { createOrchestrator, propagateAll, StateOverlay } from '../src/orchestrator/index.js';
 import type {
   CascadeTrace as _CascadeTrace,
   SimulationResult as _SimulationResult,
@@ -72,6 +72,7 @@ describe('entry point imports', () => {
   it('orchestrator entry exports orchestrator API', () => {
     expect(createOrchestrator).toBeTypeOf('function');
     expect(propagateAll).toBeTypeOf('function');
+    expect(StateOverlay).toBeTypeOf('function');
   });
 
   it('presets entry exports presets API', () => {
