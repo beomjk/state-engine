@@ -19,6 +19,10 @@
     "./presets": {
       "import": "./dist/presets/index.js",
       "types": "./dist/presets/index.d.ts"
+    },
+    "./orchestrator": {
+      "import": "./dist/orchestrator/index.js",
+      "types": "./dist/orchestrator/index.d.ts"
     }
   },
   "files": [
