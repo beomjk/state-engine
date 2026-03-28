@@ -271,6 +271,54 @@ describe('cascade behavior', () => {
     expect(result.trace.steps.find((s) => s.entityId === 'b1')).toBeUndefined();
   });
 
+  it('conflict blocks downstream propagation — downstream entity not re-evaluated', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'IDLE', to: 'PAUSED', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // b1 is unresolved (conflict)
+    expect(result.trace.unresolved).toHaveLength(1);
+    expect(result.trace.unresolved[0].entityId).toBe('b1');
+    // c1 should NOT be re-evaluated (conflict blocks propagation)
+    expect(result.trace.steps.find((s) => s.entityId === 'c1')).toBeUndefined();
+    expect(result.trace.affected).not.toContain('c1');
+    expect(result.trace.finalStates.get('c1')).toBe('IDLE');
+  });
+
   it('manual transition reporting — availableManualTransitions', () => {
     const orchestrator = buildOrchestrator({
       machines: {
@@ -867,6 +915,50 @@ describe('additional edge cases', () => {
     expect(result.trace.steps).toHaveLength(1);
     expect(result.trace.steps[0].entityId).toBe('b1');
     expect(result.trace.steps[0].to).toBe('ACTIVE');
+  });
+
+  it('auto-transition dedup merges matchedIds from multiple rules', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['c1'] } }] },
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['c2'] } }] },
+          ],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'DONE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      presets: { returns_ids: returnsIds },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+      makeEntity('c2', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // b1 transitions via deduped rule
+    expect(result.trace.steps[0].entityId).toBe('b1');
+    // Both c1 and c2 should be targeted (merged matchedIds)
+    const cSteps = result.trace.steps.filter((s) => s.entityType === 'typeC');
+    expect(cSteps).toHaveLength(2);
+    const cIds = cSteps.map((s) => s.entityId).sort();
+    expect(cIds).toEqual(['c1', 'c2']);
   });
 
   it('missing machine for cascaded entity — skip gracefully', () => {

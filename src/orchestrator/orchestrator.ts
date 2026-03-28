@@ -221,11 +221,18 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
         });
       }
 
-      // Deduplicate auto transitions by target status
+      // Deduplicate auto transitions by target status, merging matchedIds
       const uniqueAutoTargets = new Map<string, ValidTransition>();
       for (const at of autoTransitions) {
-        if (!uniqueAutoTargets.has(at.status)) {
+        const existing = uniqueAutoTargets.get(at.status);
+        if (!existing) {
           uniqueAutoTargets.set(at.status, at);
+        } else {
+          for (const id of at.matchedIds) {
+            if (!existing.matchedIds.includes(id)) {
+              existing.matchedIds.push(id);
+            }
+          }
         }
       }
 
