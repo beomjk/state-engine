@@ -2,6 +2,7 @@ export type {
   StateChange,
   CascadeStep,
   CascadeTrace,
+  ContextEnricher,
   UnresolvedEntity,
   AvailableManualTransition,
   Changeset,

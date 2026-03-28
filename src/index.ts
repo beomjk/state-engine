@@ -42,9 +42,11 @@ export type { DocGeneratorOptions } from './schema/index.js';
 // Orchestrator
 export { createOrchestrator, propagateAll, StateOverlay } from './orchestrator/index.js';
 export type {
+  AvailableManualTransition,
   CascadeStep,
   CascadeTrace,
   Changeset,
+  ContextEnricher,
   ExecutionResult,
   Orchestrator,
   OrchestratorConfig,
@@ -52,7 +54,6 @@ export type {
   SimulationResult,
   StateChange,
   UnresolvedEntity,
-  AvailableManualTransition,
 } from './orchestrator/index.js';
 
 // Presets

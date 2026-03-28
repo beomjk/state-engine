@@ -72,6 +72,8 @@ export interface CascadeTrace {
   rounds: number;
   /** Error message if cascade terminated with an exception */
   error?: string;
+  /** Original thrown value (preserves structured error info like UnknownPresetError) */
+  cause?: unknown;
 }
 
 /**
@@ -118,6 +120,16 @@ export type PropagationStrategy = (change: StateChange, relation: RelationInstan
 export const propagateAll: PropagationStrategy = () => true;
 
 /**
+ * Optional callback to enrich context with live overlay state before each engine call during cascade.
+ * Called once per entity evaluation. `getStatus` provides O(1) overlay-backed status lookups,
+ * allowing presets to see cascade-accumulated changes to other entities.
+ */
+export type ContextEnricher<TContext> = (
+  baseContext: TContext,
+  getStatus: (entityId: string) => string | undefined,
+) => TContext;
+
+/**
  * Configuration for createOrchestrator().
  */
 export interface OrchestratorConfig<TContext> {
@@ -127,6 +139,8 @@ export interface OrchestratorConfig<TContext> {
   /** Filters relation-based propagation. Ignored when a preset returns non-empty matchedIds. */
   propagation?: PropagationStrategy;
   maxCascadeDepth?: number;
+  /** Enriches context with live overlay state before each engine call during cascade. */
+  contextEnricher?: ContextEnricher<TContext>;
 }
 
 /**

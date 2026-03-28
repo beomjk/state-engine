@@ -9,6 +9,7 @@ import type {
   CascadeStep,
   CascadeTrace,
   Changeset,
+  ContextEnricher,
   ExecutionResult,
   OrchestratorConfig,
   Orchestrator,
@@ -114,6 +115,7 @@ interface CascadeConfig<TContext> {
   engine: Engine<TContext>;
   propagation: PropagationStrategy;
   maxDepth: number;
+  contextEnricher?: ContextEnricher<TContext>;
 }
 
 /**
@@ -176,6 +178,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
   let currentRound = 0;
   let converged = true;
   let cascadeError: string | undefined;
+  let cascadeCause: unknown;
 
   try {
     while (head < queue.length) {
@@ -197,9 +200,13 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
       const machine = machines[entity.type];
       if (!machine) continue; // No machine for this entity type
 
+      const evalContext = config.contextEnricher
+        ? config.contextEnricher(context, (id) => overlay.get(id)?.status)
+        : context;
+
       const validTransitions = engine.getValidTransitions(
         entity,
-        context,
+        evalContext,
         machine.rules,
         machine.manualTransitions,
       );
@@ -292,6 +299,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
   } catch (err: unknown) {
     converged = false;
     cascadeError = err instanceof Error ? err.message : String(err);
+    cascadeCause = err;
   }
 
   return {
@@ -304,6 +312,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
     converged,
     rounds: currentRound,
     ...(cascadeError !== undefined && { error: cascadeError }),
+    ...(cascadeCause !== undefined && { cause: cascadeCause }),
   };
 }
 
@@ -319,6 +328,7 @@ export function createOrchestrator<TContext>(
     relations: relationDefs,
     propagation = propagateAll,
     maxCascadeDepth = 10,
+    contextEnricher,
   } = config;
 
   function simulate(
@@ -353,6 +363,7 @@ export function createOrchestrator<TContext>(
       engine,
       propagation,
       maxDepth: maxCascadeDepth,
+      contextEnricher,
     });
 
     if (trace.error) {
@@ -414,6 +425,7 @@ export function createOrchestrator<TContext>(
       engine,
       propagation,
       maxDepth: maxCascadeDepth,
+      contextEnricher,
     });
 
     if (trace.error) {

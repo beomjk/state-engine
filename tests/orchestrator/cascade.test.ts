@@ -587,6 +587,9 @@ describe('edge cases', () => {
     if (result.error === 'cascade_error') {
       expect(result.partialTrace).toBeDefined();
       expect(result.partialTrace.trigger.entityId).toBe('a1');
+      // cause preserves the original Error instance
+      expect(result.partialTrace.cause).toBeInstanceOf(Error);
+      expect((result.partialTrace.cause as Error).message).toBe('Preset evaluation failed');
     }
   });
 
@@ -623,6 +626,8 @@ describe('edge cases', () => {
     if (result.error === 'cascade_error') {
       expect(result.partialTrace.error).toBe('raw string error');
       expect(result.partialTrace.converged).toBe(false);
+      // cause preserves the raw thrown value
+      expect(result.partialTrace.cause).toBe('raw string error');
     }
   });
 
@@ -1044,5 +1049,195 @@ describe('additional edge cases', () => {
     expect(highResult.trace.steps).toHaveLength(1);
     expect(highResult.trace.steps[0].entityId).toBe('b1');
     expect(highResult.trace.steps[0].to).toBe('ACTIVE');
+  });
+});
+
+describe('contextEnricher', () => {
+  /**
+   * Scenario: two experiments linked to a hypothesis.
+   * Hypothesis transitions only when 2+ linked experiments are COMPLETED.
+   * Without contextEnricher, the preset can't see cascade-applied status changes.
+   * With contextEnricher, the preset reads live overlay state via getStatus().
+   */
+  function buildEnricherScenario(useEnricher: boolean) {
+    // Preset: count how many linked experiment IDs are COMPLETED
+    const countCompleted = (
+      _entity: Parameters<typeof alwaysMet>[0],
+      context: { completedCount: number },
+      args: Record<string, unknown>,
+    ) => ({
+      met: context.completedCount >= (args.min as number),
+      matchedIds: [] as string[],
+    });
+
+    const engine = createEngine<{ completedCount: number }>({
+      presets: { always_met: alwaysMet, count_completed: countCompleted },
+    });
+
+    const enricher = useEnricher
+      ? (
+          _base: { completedCount: number },
+          getStatus: (id: string) => string | undefined,
+        ) => ({
+          completedCount: ['exp1', 'exp2'].filter(
+            (id) => getStatus(id) === 'COMPLETED',
+          ).length,
+        })
+      : undefined;
+
+    const orchestrator = createOrchestrator<{ completedCount: number }>({
+      engine,
+      machines: {
+        experiment: {
+          rules: [
+            { from: 'IDLE', to: 'COMPLETED', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        hypothesis: {
+          rules: [
+            {
+              from: 'PROPOSED',
+              to: 'SUPPORTED',
+              conditions: [{ fn: 'count_completed', args: { min: 2 } }],
+            },
+          ],
+        },
+      },
+      relations: [
+        { name: 'tests', source: 'experiment', target: 'hypothesis' },
+      ],
+      contextEnricher: enricher,
+    });
+
+    // exp1 already COMPLETED, exp2 still IDLE
+    const entities = buildEntityMap(
+      makeEntity('exp1', 'experiment', 'COMPLETED'),
+      makeEntity('exp2', 'experiment', 'IDLE'),
+      makeEntity('hyp1', 'hypothesis', 'PROPOSED'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'tests', sourceId: 'exp1', targetId: 'hyp1' },
+      { name: 'tests', sourceId: 'exp2', targetId: 'hyp1' },
+    ];
+
+    return { orchestrator, entities, rels };
+  }
+
+  it('enricher provides live overlay state — hypothesis transitions when 2 experiments COMPLETED', () => {
+    const { orchestrator, entities, rels } = buildEnricherScenario(true);
+
+    // Trigger: exp2 → COMPLETED (now both experiments are COMPLETED)
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      { completedCount: 0 },
+      { entityId: 'exp2', targetStatus: 'COMPLETED' },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Hypothesis should transition because enricher sees both experiments COMPLETED
+    const hypStep = result.trace.steps.find((s) => s.entityId === 'hyp1');
+    expect(hypStep).toBeDefined();
+    expect(hypStep?.to).toBe('SUPPORTED');
+  });
+
+  it('without enricher — hypothesis does NOT transition (stale context)', () => {
+    const { orchestrator, entities, rels } = buildEnricherScenario(false);
+
+    // Same trigger, but no enricher — context.completedCount stays 0
+    const result = orchestrator.simulate(
+      entities,
+      rels,
+      { completedCount: 0 },
+      { entityId: 'exp2', targetStatus: 'COMPLETED' },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Hypothesis should NOT transition (context.completedCount is still 0)
+    const hypStep = result.trace.steps.find((s) => s.entityId === 'hyp1');
+    expect(hypStep).toBeUndefined();
+  });
+
+  it('getStatus returns undefined for nonexistent entity', () => {
+    let capturedUndefined: string | undefined = 'not-called';
+
+    const engine = createEngine<{ flag: boolean }>({
+      presets: { always_met: alwaysMet },
+    });
+    const orchestrator = createOrchestrator<{ flag: boolean }>({
+      engine,
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      contextEnricher: (base, getStatus) => {
+        capturedUndefined = getStatus('nonexistent');
+        return base;
+      },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    orchestrator.simulate(entities, rels, { flag: true }, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(capturedUndefined).toBeUndefined();
+  });
+
+  it('enricher is called once per entity evaluation in cascade', () => {
+    let callCount = 0;
+
+    const engine = createEngine<Record<string, never>>({
+      presets: { always_met: alwaysMet },
+    });
+    const orchestrator = createOrchestrator<Record<string, never>>({
+      engine,
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      contextEnricher: (base, _getStatus) => {
+        callCount++;
+        return base;
+      },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    orchestrator.simulate(entities, rels, {} as Record<string, never>, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    // b1 evaluated in round 1, c1 in round 2 = 2 calls
+    expect(callCount).toBe(2);
   });
 });
