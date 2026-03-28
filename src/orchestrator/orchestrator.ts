@@ -245,8 +245,8 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
           round: entry.round,
         });
 
-        // Unresolved entity didn't transition — explore downstream with pre-cascade state
-        // (per research.md Decision 5: use current/pre-cascade state)
+        // Unresolved: no transition applied, cascade path stops here.
+        // Downstream entities are NOT re-evaluated (conflict blocks propagation).
       }
       // No match — skip silently
     }

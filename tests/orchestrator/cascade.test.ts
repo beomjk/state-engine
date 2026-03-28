@@ -309,6 +309,56 @@ describe('cascade behavior', () => {
     });
   });
 
+  it('manual transition dedup across re-evaluations in cycle', () => {
+    // A <-> B cycle with manual transitions on B.
+    // B is re-evaluated across multiple rounds; manual transitions should be reported only once.
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: {
+          rules: [
+            { from: 'S1', to: 'S2', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'S2', to: 'S1', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeB: {
+          rules: [
+            { from: 'S1', to: 'S2', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'S2', to: 'S1', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+          manualTransitions: [{ from: 'ANY', to: 'MANUAL_TARGET' }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_a', source: 'typeB', target: 'typeA' },
+      ],
+      maxCascadeDepth: 4,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'S1'),
+      makeEntity('b1', 'typeB', 'S1'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_a', sourceId: 'b1', targetId: 'a1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'S2',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // B is re-evaluated in multiple rounds, but MANUAL_TARGET should appear only once
+    const manualForB = result.trace.availableManualTransitions.filter(
+      (mt) => mt.entityId === 'b1' && mt.to === 'MANUAL_TARGET',
+    );
+    expect(manualForB).toHaveLength(1);
+  });
+
   it('application order correctness — BFS order', () => {
     // A -> B and A -> C, both at round 1
     const orchestrator = buildOrchestrator({

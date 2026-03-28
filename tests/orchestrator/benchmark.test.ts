@@ -94,6 +94,21 @@ describe('cascade performance (NFR-001)', () => {
     const elapsed = Date.now() - start;
 
     expect(result.ok).toBe(true);
-    expect(elapsed).toBeLessThan(100);
+    if (!result.ok) return;
+    expect(elapsed).toBeLessThan(50);
+
+    // Correctness: cascade must actually propagate through all 4 downstream layers
+    expect(result.trace.steps.length).toBeGreaterThan(0);
+    expect(result.trace.converged).toBe(true);
+    expect(result.trace.rounds).toBe(4); // type_0 → type_1 → type_2 → type_3 → type_4
+
+    // Fan-out from single trigger: 5 → 25 → 100 → 100 = 230 steps
+    expect(result.trace.steps).toHaveLength(230);
+
+    // Verify cascade reached deepest layer
+    const type4Steps = result.trace.steps.filter((s) => s.entityType === 'type_4');
+    expect(type4Steps.length).toBe(100);
+    expect(result.trace.finalStates.get('type_1_0')).toBe('ACTIVE');
+    expect(result.trace.finalStates.get('type_4_0')).toBe('ACTIVE');
   });
 });

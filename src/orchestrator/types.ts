@@ -105,6 +105,10 @@ export type ExecutionResult =
 
 /**
  * Consumer-provided function that decides whether to propagate across a specific relation.
+ *
+ * Note: when a transition's preset returns non-empty `matchedIds`, those IDs are used
+ * directly as downstream targets — bypassing both relation definitions and this strategy.
+ * This is by design: instance-level targeting (matchedIds) overrides type-level filtering.
  */
 export type PropagationStrategy = (change: StateChange, relation: RelationInstance) => boolean;
 
@@ -120,6 +124,7 @@ export interface OrchestratorConfig<TContext> {
   engine: Engine<TContext>;
   machines: Record<string, { rules: TransitionRule[]; manualTransitions?: ManualTransition[] }>;
   relations: RelationDefinition[];
+  /** Filters relation-based propagation. Ignored when a preset returns non-empty matchedIds. */
   propagation?: PropagationStrategy;
   maxCascadeDepth?: number;
 }
@@ -128,6 +133,10 @@ export interface OrchestratorConfig<TContext> {
  * Public orchestrator interface.
  */
 export interface Orchestrator<TContext> {
+  /**
+   * What-if mode: force-applies the trigger status without validation,
+   * then runs cascade to explore downstream effects.
+   */
   simulate(
     entities: Map<string, Entity>,
     relations: RelationInstance[],
@@ -135,6 +144,10 @@ export interface Orchestrator<TContext> {
     trigger: { entityId: string; targetStatus: string },
   ): SimulationResult;
 
+  /**
+   * Validates the trigger transition against the engine first,
+   * then runs cascade and returns an applicable changeset.
+   */
   execute(
     entities: Map<string, Entity>,
     relations: RelationInstance[],
