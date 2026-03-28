@@ -6,6 +6,27 @@ import type { TransitionCondition, TransitionRule, ManualTransition } from '../e
 export type PresetArgsMap = Record<string, Record<string, unknown>>;
 
 /**
+ * Declares a named, typed connection between two entity types.
+ */
+export interface RelationDefinition {
+  name: string;
+  source: string;
+  target: string;
+  direction?: 'default' | 'reverse';
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Runtime representation of a concrete relation between two entity instances.
+ */
+export interface RelationInstance {
+  name: string;
+  sourceId: string;
+  targetId: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * Entity definition with compile-time type safety for statuses, preset names, and args.
  */
 export interface EntityDefinition<
@@ -40,6 +61,7 @@ export interface SchemaDefinition<TPresetNames extends readonly string[]> {
   presetNames: TPresetNames;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entities: Record<string, EntityDefinition<readonly string[], TPresetNames, any>>;
+  relations?: RelationDefinition[];
   policy?: {
     /**
      * Metadata only — the engine does not enforce this (FR-015).
@@ -58,6 +80,8 @@ export interface Definer<TPresetNames extends readonly string[], TArgsMap extend
   entity<const TStatuses extends readonly string[]>(
     definition: EntityDefinition<TStatuses, TPresetNames, TArgsMap>,
   ): EntityDefinition<TStatuses, TPresetNames, TArgsMap>;
+  relation(definition: RelationDefinition): void;
+  getRelations(): RelationDefinition[];
 }
 
 /**
@@ -69,6 +93,8 @@ export interface DefinerWithoutArgs<TPresetNames extends readonly string[]> {
   entity<const TStatuses extends readonly string[]>(
     definition: EntityDefinition<TStatuses, TPresetNames>,
   ): EntityDefinition<TStatuses, TPresetNames>;
+  relation(definition: RelationDefinition): void;
+  getRelations(): RelationDefinition[];
 }
 
 /**
@@ -83,6 +109,16 @@ export interface DefinerWithoutArgs<TPresetNames extends readonly string[]> {
 export function createDefiner<const TPresetNames extends readonly string[]>(
   _presetNames: TPresetNames,
 ): DefinerWithoutArgs<TPresetNames> {
+  const relations: RelationDefinition[] = [];
+
+  function relation(definition: RelationDefinition): void {
+    relations.push(definition);
+  }
+
+  function getRelations(): RelationDefinition[] {
+    return [...relations];
+  }
+
   return {
     withArgs<TArgsMap extends PresetArgsMap>(): Definer<TPresetNames, TArgsMap> {
       return {
@@ -91,6 +127,8 @@ export function createDefiner<const TPresetNames extends readonly string[]>(
         ): EntityDefinition<TStatuses, TPresetNames, TArgsMap> {
           return definition;
         },
+        relation,
+        getRelations,
       };
     },
     entity<const TStatuses extends readonly string[]>(
@@ -98,6 +136,8 @@ export function createDefiner<const TPresetNames extends readonly string[]>(
     ): EntityDefinition<TStatuses, TPresetNames> {
       return definition;
     },
+    relation,
+    getRelations,
   };
 }
 
@@ -124,6 +164,41 @@ export function defineSchema<const TPresetNames extends readonly string[]>(
   definition: SchemaDefinition<TPresetNames>,
 ): SchemaDefinition<TPresetNames> {
   return definition;
+}
+
+/**
+ * Extract RelationDefinition[] from a schema, with validation.
+ * Returns [] when schema.relations is undefined or empty.
+ */
+export function extractRelations(
+  schema: SchemaDefinition<readonly string[]>,
+): RelationDefinition[] {
+  if (!schema.relations || schema.relations.length === 0) return [];
+
+  const entityKeys = Object.keys(schema.entities);
+  const seen = new Set<string>();
+
+  for (const rel of schema.relations) {
+    if (seen.has(rel.name)) {
+      throw new Error(`Duplicate relation name: "${rel.name}"`);
+    }
+    seen.add(rel.name);
+
+    if (!entityKeys.includes(rel.source)) {
+      throw new Error(
+        `Relation "${rel.name}" references invalid source entity type: "${rel.source}". ` +
+          `Available: ${entityKeys.join(', ')}`,
+      );
+    }
+    if (!entityKeys.includes(rel.target)) {
+      throw new Error(
+        `Relation "${rel.name}" references invalid target entity type: "${rel.target}". ` +
+          `Available: ${entityKeys.join(', ')}`,
+      );
+    }
+  }
+
+  return schema.relations;
 }
 
 /**

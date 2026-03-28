@@ -21,6 +21,7 @@ export {
   defineEntity,
   defineSchema,
   extractManualTransitions,
+  extractRelations,
   extractRules,
 } from './schema/index.js';
 export type {
@@ -28,6 +29,8 @@ export type {
   DefinerWithoutArgs,
   EntityDefinition,
   PresetArgsMap,
+  RelationDefinition,
+  RelationInstance,
   SchemaDefinition,
 } from './schema/index.js';
 export { generateDocs, generateMermaid, updateDocContent } from './schema/index.js';

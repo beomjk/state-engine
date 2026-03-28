@@ -3,6 +3,7 @@ export {
   defineEntity,
   defineSchema,
   extractManualTransitions,
+  extractRelations,
   extractRules,
 } from './define.js';
 export type {
@@ -10,6 +11,8 @@ export type {
   DefinerWithoutArgs,
   EntityDefinition,
   PresetArgsMap,
+  RelationDefinition,
+  RelationInstance,
   SchemaDefinition,
 } from './define.js';
 export { generateDocs, generateMermaid, updateDocContent } from './docs.js';
