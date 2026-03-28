@@ -140,8 +140,9 @@ describe('cascade behavior', () => {
     // D should be triggered by both B and C (merged triggeredBy)
     const dStep = result.trace.steps.find((s) => s.entityId === 'd1');
     expect(dStep).toBeDefined();
-    expect(dStep!.triggeredBy).toContain('b1');
-    expect(dStep!.triggeredBy).toContain('c1');
+    if (!dStep) return;
+    expect(dStep.triggeredBy).toContain('b1');
+    expect(dStep.triggeredBy).toContain('c1');
   });
 
   it('cycle terminates within maxDepth', () => {
