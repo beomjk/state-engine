@@ -28,7 +28,9 @@ export function generateDocs(
   schema: SchemaDefinition<readonly string[]>,
   options?: DocGeneratorOptions,
 ): Record<string, string> {
-  const tables = options?.tables ?? ['statuses', 'transitions', 'manual-transitions', 'relations'];
+  const defaultTables: typeof tables = ['statuses', 'transitions', 'manual-transitions'];
+  if (schema.relations?.length) defaultTables.push('relations');
+  const tables = options?.tables ?? defaultTables;
   const result: Record<string, string> = {};
 
   for (const table of tables) {

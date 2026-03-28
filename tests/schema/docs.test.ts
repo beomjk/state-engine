@@ -72,7 +72,8 @@ describe('generateDocs', () => {
     expect(docs).toHaveProperty('statuses');
     expect(docs).toHaveProperty('transitions');
     expect(docs).toHaveProperty('manual-transitions');
-    expect(docs).toHaveProperty('relations');
+    // 'relations' key is only included when schema has relations defined
+    expect(docs).not.toHaveProperty('relations');
   });
 
   it('shows em-dash for transitions with no conditions', () => {
