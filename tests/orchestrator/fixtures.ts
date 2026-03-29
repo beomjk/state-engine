@@ -7,11 +7,6 @@ export const alwaysMet = (_e: Entity, _c: unknown, _a: Record<string, unknown>):
   matchedIds: [],
 });
 
-export const neverMet = (_e: Entity, _c: unknown, _a: Record<string, unknown>): PresetResult => ({
-  met: false,
-  matchedIds: [],
-});
-
 /**
  * Preset that checks entity.meta[field] === value.
  */

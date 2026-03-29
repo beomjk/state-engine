@@ -77,8 +77,10 @@ describe('cascade behavior', () => {
     expect(result.trace.steps).toHaveLength(2);
     expect(result.trace.steps[0].entityId).toBe('b1');
     expect(result.trace.steps[0].to).toBe('ACTIVE');
+    expect(result.trace.steps[0].rule).toEqual({ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] });
     expect(result.trace.steps[1].entityId).toBe('c1');
     expect(result.trace.steps[1].to).toBe('ACTIVE');
+    expect(result.trace.steps[1].rule).toEqual({ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] });
     expect(result.trace.affected).toEqual(['b1', 'c1']);
   });
 
@@ -144,6 +146,7 @@ describe('cascade behavior', () => {
     if (!dStep) return;
     expect(dStep.triggeredBy).toContain('b1');
     expect(dStep.triggeredBy).toContain('c1');
+    expect(dStep.rule).toEqual({ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] });
   });
 
   it('cycle terminates within maxDepth', () => {
@@ -267,6 +270,7 @@ describe('cascade behavior', () => {
     expect(result.trace.unresolved[0].entityId).toBe('b1');
     expect(result.trace.unresolved[0].conflictingTargets).toContain('ACTIVE');
     expect(result.trace.unresolved[0].conflictingTargets).toContain('PAUSED');
+    expect(result.trace.unresolved[0].round).toBe(1);
     // b1 should NOT appear in steps (not applied)
     expect(result.trace.steps.find((s) => s.entityId === 'b1')).toBeUndefined();
   });
@@ -1049,6 +1053,104 @@ describe('additional edge cases', () => {
     expect(highResult.trace.steps).toHaveLength(1);
     expect(highResult.trace.steps[0].entityId).toBe('b1');
     expect(highResult.trace.steps[0].to).toBe('ACTIVE');
+  });
+
+  it('maxCascadeDepth=1 — only immediate downstream evaluated', () => {
+    // A -> B -> C chain, but depth=1 means only B (round 1) should fire; C (round 2) is blocked
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'a_to_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_to_c', source: 'typeB', target: 'typeC' },
+      ],
+      maxCascadeDepth: 1,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_to_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_to_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Only B transitions (round 1); C is blocked because round 2 > maxDepth 1
+    expect(result.trace.steps).toHaveLength(1);
+    expect(result.trace.steps[0].entityId).toBe('b1');
+    expect(result.trace.steps[0].to).toBe('ACTIVE');
+    expect(result.trace.steps[0].round).toBe(1);
+    expect(result.trace.converged).toBe(false);
+    expect(result.trace.finalStates.get('c1')).toBe('IDLE');
+  });
+
+  it('many-to-one fan-in — multiple sources trigger same target in same round', () => {
+    // Parent P -> A1 + A2 (both typeA), both A1 and A2 -> B1 (typeB)
+    // P triggers cascade: A1 and A2 both transition in round 1, B1 in round 2
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeP: { rules: [] },
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'p_to_a', source: 'typeP', target: 'typeA' },
+        { name: 'a_to_b', source: 'typeA', target: 'typeB' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('p1', 'typeP', 'IDLE'),
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('a2', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'p_to_a', sourceId: 'p1', targetId: 'a1' },
+      { name: 'p_to_a', sourceId: 'p1', targetId: 'a2' },
+      { name: 'a_to_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'a_to_b', sourceId: 'a2', targetId: 'b1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'p1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // A1 and A2 in round 1, B1 in round 2 (deduped — only evaluated once)
+    expect(result.trace.steps).toHaveLength(3);
+    const bStep = result.trace.steps.find((s) => s.entityId === 'b1');
+    expect(bStep).toBeDefined();
+    if (!bStep) return;
+    expect(bStep.round).toBe(2);
+    expect(bStep.to).toBe('ACTIVE');
+    // B1 should have both A1 and A2 in triggeredBy (merged via BFS dedup)
+    expect(bStep.triggeredBy).toContain('a1');
+    expect(bStep.triggeredBy).toContain('a2');
+    expect(bStep.triggeredBy).toHaveLength(2);
+    expect(result.trace.converged).toBe(true);
   });
 });
 

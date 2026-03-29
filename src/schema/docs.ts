@@ -4,7 +4,8 @@ export interface DocGeneratorOptions {
   /**
    * Which tables to generate.
    * Available: 'statuses', 'transitions', 'manual-transitions', 'relations'.
-   * Defaults to all four when omitted.
+   * Defaults to statuses, transitions, and manual-transitions.
+   * When the schema has relations, also includes relations.
    */
   tables: ('statuses' | 'transitions' | 'manual-transitions' | 'relations')[];
 }
@@ -21,8 +22,8 @@ function formatCondition(c: { fn: string; args: Record<string, unknown> }): stri
  * Generate Markdown table strings from a schema definition.
  * Returns a record of table name → markdown string.
  *
- * When `options.tables` is omitted, all four tables are generated
- * (statuses, transitions, manual-transitions, relations).
+ * When `options.tables` is omitted, defaults to statuses, transitions,
+ * and manual-transitions. If the schema defines relations, also includes relations.
  */
 export function generateDocs(
   schema: SchemaDefinition<readonly string[]>,

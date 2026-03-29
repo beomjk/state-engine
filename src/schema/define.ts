@@ -220,7 +220,7 @@ export function extractRelations(
     }
   }
 
-  return schema.relations;
+  return [...schema.relations];
 }
 
 /**
