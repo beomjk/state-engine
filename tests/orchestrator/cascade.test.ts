@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import { createOrchestrator } from '../../src/orchestrator/orchestrator.js';
 import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
+import { propagateAll } from '../../src/orchestrator/types.js';
 import {
   buildEntityMap,
   makeEntity,
@@ -1945,5 +1946,90 @@ describe('invariant verification', () => {
     expect(result.trace.converged).toBe(false);
     // No error — just depth exceeded
     expect(result.trace.error).toBeUndefined();
+  });
+});
+
+describe('default maxCascadeDepth', () => {
+  it('omitting maxCascadeDepth defaults to 10', () => {
+    // 12-hop chain needs depth > 10 to fully converge
+    const chain = buildChain(12);
+    const engine = createEngine<unknown>({
+      presets: { always_met: alwaysMet },
+    });
+    // No maxCascadeDepth — should default to 10
+    const orchestrator = createOrchestrator<unknown>({
+      engine,
+      machines: chain.machines,
+      relations: chain.relations,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 11 hops exceeds default depth of 10 → not converged
+    expect(result.trace.converged).toBe(false);
+    expect(result.trace.rounds).toBe(10);
+    expect(result.trace.steps).toHaveLength(10);
+    // e11 should NOT have transitioned (round 11 > maxDepth 10)
+    expect(result.trace.finalStates.get('e11')).toBe('IDLE');
+  });
+});
+
+describe('propagateAll direct contract', () => {
+  it('returns true for any change/relation pair', () => {
+    const change = { entityId: 'a1', entityType: 'typeA', from: 'X', to: 'Y' };
+    const relation = { name: 'rel', sourceId: 'a1', targetId: 'b1' };
+    expect(propagateAll(change, relation)).toBe(true);
+  });
+});
+
+describe('partial fan-out', () => {
+  it('only siblings meeting conditions transition; others stay unchanged', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        parent: { rules: [] },
+        child: {
+          rules: [{
+            from: 'IDLE',
+            to: 'ACTIVE',
+            conditions: [{ fn: 'field_equals', args: { field: 'ready', value: true } }],
+          }],
+        },
+      },
+      relations: [{ name: 'parent_child', source: 'parent', target: 'child' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('p1', 'parent', 'IDLE'),
+      makeEntity('c1', 'child', 'IDLE', { ready: true }),
+      makeEntity('c2', 'child', 'IDLE', { ready: true }),
+      makeEntity('c3', 'child', 'IDLE', { ready: false }),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'parent_child', sourceId: 'p1', targetId: 'c1' },
+      { name: 'parent_child', sourceId: 'p1', targetId: 'c2' },
+      { name: 'parent_child', sourceId: 'p1', targetId: 'c3' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'p1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Only c1 and c2 should transition (ready=true)
+    expect(result.trace.steps).toHaveLength(2);
+    const transitionedIds = result.trace.steps.map((s) => s.entityId).sort();
+    expect(transitionedIds).toEqual(['c1', 'c2']);
+    // c3 should remain IDLE
+    expect(result.trace.finalStates.get('c3')).toBe('IDLE');
+    // c1 and c2 should be ACTIVE
+    expect(result.trace.finalStates.get('c1')).toBe('ACTIVE');
+    expect(result.trace.finalStates.get('c2')).toBe('ACTIVE');
   });
 });

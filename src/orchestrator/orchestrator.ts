@@ -332,20 +332,15 @@ export function createOrchestrator<TContext>(
     contextEnricher,
   } = config;
 
-  function simulate(
+  /** Shared setup: find entity, create overlay, build trigger change. */
+  function initTrigger(
     entities: Map<string, Entity>,
-    relations: RelationInstance[],
-    context: TContext,
     trigger: { entityId: string; targetStatus: string },
-  ): SimulationResult {
+  ): { entity: Entity; overlay: StateOverlay; triggerChange: StateChange } | null {
     const entity = entities.get(trigger.entityId);
-    if (!entity) {
-      return { ok: false, error: 'entity_not_found', entityId: trigger.entityId };
-    }
+    if (!entity) return null;
 
     const overlay = new StateOverlay(entities);
-
-    // Force trigger status (what-if mode)
     const triggerChange: StateChange = {
       entityId: entity.id,
       entityType: entity.type,
@@ -353,49 +348,72 @@ export function createOrchestrator<TContext>(
       to: trigger.targetStatus,
     };
     overlay.set(entity.id, { ...entity, status: trigger.targetStatus });
+    return { entity, overlay, triggerChange };
+  }
 
-    const trace = runCascade({
-      overlay,
+  /** Run cascade from an initialized trigger and return the trace. */
+  function cascade(
+    init: { overlay: StateOverlay; triggerChange: StateChange },
+    relations: RelationInstance[],
+    context: TContext,
+  ): CascadeTrace {
+    return runCascade({
+      overlay: init.overlay,
       relationInstances: relations,
       relationDefs,
       context,
-      triggerChange,
+      triggerChange: init.triggerChange,
       machines,
       engine,
       propagation,
       maxDepth: maxCascadeDepth,
       contextEnricher,
     });
+  }
 
-    if (trace.error) {
-      return { ok: false, error: 'cascade_error', partialTrace: trace };
-    }
+  function simulate(
+    entities: Map<string, Entity>,
+    relations: RelationInstance[],
+    context: TContext,
+    trigger: { entityId: string; targetStatus: string },
+  ): SimulationResult {
+    const init = initTrigger(entities, trigger);
+    if (!init) return { ok: false, error: 'entity_not_found', entityId: trigger.entityId };
+
+    const trace = cascade(init, relations, context);
+
+    if (trace.error) return { ok: false, error: 'cascade_error', partialTrace: trace };
     return { ok: true, trace };
   }
 
+  /**
+   * Validates the trigger transition against the engine first,
+   * then runs cascade and returns an applicable changeset.
+   *
+   * Note: trigger validation uses the base context (not enriched via contextEnricher).
+   * The cascade itself uses enriched context for downstream evaluations.
+   */
   function execute(
     entities: Map<string, Entity>,
     relations: RelationInstance[],
     context: TContext,
     trigger: { entityId: string; targetStatus: string },
   ): ExecutionResult {
-    const entity = entities.get(trigger.entityId);
-    if (!entity) {
-      return { ok: false, error: 'entity_not_found', entityId: trigger.entityId };
-    }
+    const init = initTrigger(entities, trigger);
+    if (!init) return { ok: false, error: 'entity_not_found', entityId: trigger.entityId };
 
-    // Validate trigger transition
-    const machine = machines[entity.type];
+    // Validate trigger transition against base context
+    const machine = machines[init.entity.type];
     if (!machine) {
       return {
         ok: false,
         error: 'validation_failed',
-        reason: `No machine found for entity type "${entity.type}"`,
+        reason: `No machine found for entity type "${init.entity.type}"`,
       };
     }
 
     const validation = engine.validate(
-      entity,
+      init.entity,
       context,
       machine.rules,
       trigger.targetStatus,
@@ -406,35 +424,12 @@ export function createOrchestrator<TContext>(
       return { ok: false, error: 'validation_failed', reason: validation.reason };
     }
 
-    const overlay = new StateOverlay(entities);
+    const trace = cascade(init, relations, context);
 
-    const triggerChange: StateChange = {
-      entityId: entity.id,
-      entityType: entity.type,
-      from: entity.status,
-      to: trigger.targetStatus,
-    };
-    overlay.set(entity.id, { ...entity, status: trigger.targetStatus });
-
-    const trace = runCascade({
-      overlay,
-      relationInstances: relations,
-      relationDefs,
-      context,
-      triggerChange,
-      machines,
-      engine,
-      propagation,
-      maxDepth: maxCascadeDepth,
-      contextEnricher,
-    });
-
-    if (trace.error) {
-      return { ok: false, error: 'cascade_error', partialTrace: trace };
-    }
+    if (trace.error) return { ok: false, error: 'cascade_error', partialTrace: trace };
 
     const changeset: Changeset = {
-      changes: [triggerChange, ...trace.steps],
+      changes: [init.triggerChange, ...trace.steps],
       trace,
       unresolved: trace.unresolved,
     };

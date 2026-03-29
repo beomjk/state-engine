@@ -10,7 +10,7 @@ export class StateOverlay {
   private readonly overrides: Map<string, Entity> = new Map();
 
   constructor(base: Map<string, Entity>) {
-    this.base = base;
+    this.base = new Map(base);
   }
 
   get(id: string): Entity | undefined {

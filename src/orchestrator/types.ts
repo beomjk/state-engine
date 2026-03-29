@@ -1,5 +1,5 @@
 import type { Entity, Engine, TransitionRule, ManualTransition } from '../engine/types.js';
-import type { RelationDefinition, RelationInstance } from '../schema/define.js';
+import type { RelationDefinition, RelationInstance } from '../schema/index.js';
 
 // Re-export schema-canonical relation types for orchestrator consumers
 export type { RelationDefinition, RelationInstance };
@@ -138,6 +138,7 @@ export interface OrchestratorConfig<TContext> {
   relations: RelationDefinition[];
   /** Filters relation-based propagation. Ignored when a preset returns non-empty matchedIds. */
   propagation?: PropagationStrategy;
+  /** Maximum BFS cascade depth. Defaults to 10. */
   maxCascadeDepth?: number;
   /** Enriches context with live overlay state before each engine call during cascade. */
   contextEnricher?: ContextEnricher<TContext>;
