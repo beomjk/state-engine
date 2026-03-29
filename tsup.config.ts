@@ -6,6 +6,7 @@ export default defineConfig({
     'engine/index': 'src/engine/index.ts',
     'schema/index': 'src/schema/index.ts',
     'presets/index': 'src/presets/index.ts',
+    'orchestrator/index': 'src/orchestrator/index.ts',
   },
   format: ['esm'],
   dts: true,

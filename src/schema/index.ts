@@ -2,14 +2,20 @@ export {
   createDefiner,
   defineEntity,
   defineSchema,
+  DuplicateRelationError,
+  extractMachines,
   extractManualTransitions,
+  extractRelations,
   extractRules,
+  InvalidRelationEntityError,
 } from './define.js';
 export type {
   Definer,
   DefinerWithoutArgs,
   EntityDefinition,
   PresetArgsMap,
+  RelationDefinition,
+  RelationInstance,
   SchemaDefinition,
 } from './define.js';
 export { generateDocs, generateMermaid, updateDocContent } from './docs.js';

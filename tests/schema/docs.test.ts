@@ -72,6 +72,8 @@ describe('generateDocs', () => {
     expect(docs).toHaveProperty('statuses');
     expect(docs).toHaveProperty('transitions');
     expect(docs).toHaveProperty('manual-transitions');
+    // 'relations' key is only included when schema has relations defined
+    expect(docs).not.toHaveProperty('relations');
   });
 
   it('shows em-dash for transitions with no conditions', () => {
@@ -138,6 +140,57 @@ Footer`;
     expect(result.content).toContain('Footer');
     expect(result.content).toContain('| PROPOSED |');
     expect(result.content).not.toContain('\nold\n');
+  });
+
+  it('skips reversed AUTO markers (end before start)', () => {
+    const schema = makeSchema();
+    const content = `# States
+<!-- /AUTO:statuses -->
+old content here
+<!-- AUTO:statuses -->
+`;
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('handles only start marker present (missing end)', () => {
+    const schema = makeSchema();
+    const content = `# States\n<!-- AUTO:statuses -->\nold content\n`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('handles only end marker present (missing start)', () => {
+    const schema = makeSchema();
+    const content = `# States\nold content\n<!-- /AUTO:statuses -->\n`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('replaces some tables when only some markers exist', () => {
+    const schema = makeSchema();
+    const content = `<!-- AUTO:statuses -->
+old
+<!-- /AUTO:statuses -->
+No transitions markers here.`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(true);
+    expect(result.tablesReplaced).toEqual(['statuses']);
+    expect(result.tablesReplaced).not.toContain('transitions');
+    expect(result.content).toContain('| PROPOSED |');
   });
 });
 
@@ -255,6 +308,94 @@ describe('generateMermaid', () => {
     expect(result).toContain('TESTING --> REJECTED: manual');
     expect(result).toContain('VALIDATED --> REJECTED: manual');
     expect(result).not.toContain('REJECTED --> REJECTED');
+  });
+});
+
+describe('generateDocs — relations', () => {
+  it('generates relations table', () => {
+    const d = createDefiner(presetNames).withArgs<BuiltinPresetArgsMap>();
+    const entityA = d.entity({ name: 'Experiment', statuses: ['A'] as const });
+    const entityB = d.entity({ name: 'Hypothesis', statuses: ['B'] as const });
+    d.relation({
+      name: 'tests',
+      source: 'experiment',
+      target: 'hypothesis',
+      metadata: { classification: 'conducts' },
+    });
+    const schema = defineSchema({
+      presetNames,
+      entities: { experiment: entityA, hypothesis: entityB },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+
+    expect(docs.relations).toContain('| Relation | Source | Target | Direction | Metadata |');
+    expect(docs.relations).toContain('| tests | experiment | hypothesis | default |');
+    expect(docs.relations).toContain('"classification":"conducts"');
+  });
+
+  it('direction defaults to "default" in output', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| default |');
+  });
+
+  it('shows reverse direction', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'depends', source: 'a', target: 'a', direction: 'reverse' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| reverse |');
+  });
+
+  it('shows em-dash for missing metadata', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toContain('| \u2014 |');
+  });
+
+  it('schema with no relations — empty relations table', () => {
+    const schema = makeSchema();
+    const docs = generateDocs(schema, { tables: ['relations'] });
+    expect(docs.relations).toBe('');
+  });
+
+  it('relations included in default tables', () => {
+    const d = createDefiner(presetNames).withArgs<BuiltinPresetArgsMap>();
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    d.relation({ name: 'link', source: 'a', target: 'a' });
+    const schema = defineSchema({
+      presetNames,
+      entities: { a: entity },
+      relations: d.getRelations(),
+    });
+
+    const docs = generateDocs(schema);
+    expect(docs).toHaveProperty('relations');
+    expect(docs.relations).toContain('| link |');
   });
 });
 

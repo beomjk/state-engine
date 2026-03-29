@@ -1,8 +1,13 @@
 import type { EntityDefinition, SchemaDefinition } from './define.js';
 
 export interface DocGeneratorOptions {
-  /** Which tables to generate. */
-  tables: ('statuses' | 'transitions' | 'manual-transitions')[];
+  /**
+   * Which tables to generate.
+   * Available: 'statuses', 'transitions', 'manual-transitions', 'relations'.
+   * Defaults to statuses, transitions, and manual-transitions.
+   * When the schema has relations, also includes relations.
+   */
+  tables: ('statuses' | 'transitions' | 'manual-transitions' | 'relations')[];
 }
 
 /** Format a condition as `fn(key=value, ...)`. */
@@ -16,12 +21,17 @@ function formatCondition(c: { fn: string; args: Record<string, unknown> }): stri
 /**
  * Generate Markdown table strings from a schema definition.
  * Returns a record of table name → markdown string.
+ *
+ * When `options.tables` is omitted, defaults to statuses, transitions,
+ * and manual-transitions. If the schema defines relations, also includes relations.
  */
 export function generateDocs(
   schema: SchemaDefinition<readonly string[]>,
   options?: DocGeneratorOptions,
 ): Record<string, string> {
-  const tables = options?.tables ?? ['statuses', 'transitions', 'manual-transitions'];
+  const defaultTables: DocGeneratorOptions['tables'] = ['statuses', 'transitions', 'manual-transitions'];
+  if (schema.relations?.length) defaultTables.push('relations');
+  const tables = options?.tables ?? defaultTables;
   const result: Record<string, string> = {};
 
   for (const table of tables) {
@@ -58,6 +68,18 @@ export function generateDocs(
         }
         lines.push('');
       }
+    }
+
+    // Relations are schema-level (not per-entity), so rendered outside the entity loop
+    if (table === 'relations' && schema.relations?.length) {
+      lines.push('| Relation | Source | Target | Direction | Metadata |');
+      lines.push('|----------|--------|--------|-----------|----------|');
+      for (const rel of schema.relations) {
+        const direction = rel.direction ?? 'default';
+        const metadata = rel.metadata ? JSON.stringify(rel.metadata) : '\u2014';
+        lines.push(`| ${rel.name} | ${rel.source} | ${rel.target} | ${direction} | ${metadata} |`);
+      }
+      lines.push('');
     }
 
     result[table] = lines.join('\n');

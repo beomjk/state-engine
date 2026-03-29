@@ -6,8 +6,12 @@ import {
   createEngine,
   defineEntity,
   defineSchema,
+  extractMachines,
+  extractRelations,
   extractRules,
   extractManualTransitions,
+  DuplicateRelationError,
+  InvalidRelationEntityError,
   generateDocs,
   generateMermaid,
   updateDocContent,
@@ -33,6 +37,23 @@ import {
   extractRules as er2,
 } from '../src/schema/index.js';
 
+// Entry point: @beomjk/state-engine/orchestrator
+import { createOrchestrator, propagateAll, StateOverlay } from '../src/orchestrator/index.js';
+import type {
+  AvailableManualTransition as _AvailableManualTransition,
+  CascadeStep as _CascadeStep,
+  CascadeTrace as _CascadeTrace,
+  Changeset as _Changeset,
+  ContextEnricher as _ContextEnricher,
+  ExecutionResult as _ExecutionResult,
+  Orchestrator as _Orchestrator,
+  OrchestratorConfig as _OrchestratorConfig,
+  PropagationStrategy as _PropagationStrategy,
+  SimulationResult as _SimulationResult,
+  StateChange as _StateChange,
+  UnresolvedEntity as _UnresolvedEntity,
+} from '../src/orchestrator/index.js';
+
 // Entry point: @beomjk/state-engine/presets
 import { builtinPresets as bp2 } from '../src/presets/index.js';
 
@@ -42,8 +63,12 @@ describe('entry point imports', () => {
     expect(createEngine).toBeTypeOf('function');
     expect(defineEntity).toBeTypeOf('function');
     expect(defineSchema).toBeTypeOf('function');
+    expect(extractMachines).toBeTypeOf('function');
+    expect(extractRelations).toBeTypeOf('function');
     expect(extractRules).toBeTypeOf('function');
     expect(extractManualTransitions).toBeTypeOf('function');
+    expect(DuplicateRelationError).toBeTypeOf('function');
+    expect(InvalidRelationEntityError).toBeTypeOf('function');
     expect(generateDocs).toBeTypeOf('function');
     expect(generateMermaid).toBeTypeOf('function');
     expect(updateDocContent).toBeTypeOf('function');
@@ -59,6 +84,12 @@ describe('entry point imports', () => {
     expect(cd2).toBeTypeOf('function');
     expect(de2).toBeTypeOf('function');
     expect(er2).toBeTypeOf('function');
+  });
+
+  it('orchestrator entry exports orchestrator API', () => {
+    expect(createOrchestrator).toBeTypeOf('function');
+    expect(propagateAll).toBeTypeOf('function');
+    expect(StateOverlay).toBeTypeOf('function');
   });
 
   it('presets entry exports presets API', () => {

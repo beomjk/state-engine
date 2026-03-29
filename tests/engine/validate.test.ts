@@ -126,4 +126,42 @@ describe('engine.validate', () => {
       expect(result.matchedIds).toEqual([]);
     }
   });
+
+  it('empty rules + empty manual transitions → invalid', () => {
+    const engine = createEngine({ presets: {} });
+
+    const result = engine.validate(entity, {}, [], 'TESTING', []);
+
+    expect(result.valid).toBe(false);
+  });
+
+  it('empty rules + matching manual → valid with rule=null', () => {
+    const engine = createEngine({ presets: {} });
+    const manual: ManualTransition[] = [{ from: 'PROPOSED', to: 'TESTING' }];
+
+    const result = engine.validate(entity, {}, [], 'TESTING', manual);
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.rule).toBeNull();
+      expect(result.matchedIds).toEqual([]);
+    }
+  });
+
+  it('multiple rules same from/to, different conditions — first match wins', () => {
+    const engine = createEngine({ presets: { pass: alwaysMet, fail: neverMet } });
+    const rules: TransitionRule[] = [
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'fail', args: {} }] },
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'pass', args: {} }] },
+      { from: 'PROPOSED', to: 'TESTING', conditions: [{ fn: 'pass', args: {} }] },
+    ];
+
+    const result = engine.validate(entity, {}, rules, 'TESTING');
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      // First failing rule skipped, second (first passing) rule returned
+      expect(result.rule).toEqual(rules[1]);
+    }
+  });
 });

@@ -20,18 +20,41 @@ export {
   createDefiner,
   defineEntity,
   defineSchema,
+  DuplicateRelationError,
+  extractMachines,
   extractManualTransitions,
+  extractRelations,
   extractRules,
+  InvalidRelationEntityError,
 } from './schema/index.js';
 export type {
   Definer,
   DefinerWithoutArgs,
   EntityDefinition,
   PresetArgsMap,
+  RelationDefinition,
+  RelationInstance,
   SchemaDefinition,
 } from './schema/index.js';
 export { generateDocs, generateMermaid, updateDocContent } from './schema/index.js';
 export type { DocGeneratorOptions } from './schema/index.js';
+
+// Orchestrator
+export { createOrchestrator, propagateAll, StateOverlay } from './orchestrator/index.js';
+export type {
+  AvailableManualTransition,
+  CascadeStep,
+  CascadeTrace,
+  Changeset,
+  ContextEnricher,
+  ExecutionResult,
+  Orchestrator,
+  OrchestratorConfig,
+  PropagationStrategy,
+  SimulationResult,
+  StateChange,
+  UnresolvedEntity,
+} from './orchestrator/index.js';
 
 // Presets
 export { builtinPresets } from './presets/index.js';
