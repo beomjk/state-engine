@@ -164,23 +164,22 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
     queue.push(entry);
   }
 
-  // Seed the queue with downstream of the trigger
-  const initialDownstream = findDownstream(
-    triggerChange,
-    relationDefs,
-    relationIndex,
-    propagation,
-  );
-  for (const id of initialDownstream) {
-    enqueue(id, [triggerChange.entityId], 1);
-  }
-
   let currentRound = 0;
   let converged = true;
   let cascadeError: string | undefined;
   let cascadeCause: unknown;
 
   try {
+    // Seed the queue with downstream of the trigger
+    const initialDownstream = findDownstream(
+      triggerChange,
+      relationDefs,
+      relationIndex,
+      propagation,
+    );
+    for (const id of initialDownstream) {
+      enqueue(id, [triggerChange.entityId], 1);
+    }
     while (head < queue.length) {
       const entry = queue[head++];
 
@@ -195,10 +194,10 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
       const entity = overlay.get(entry.entityId);
       if (!entity) continue; // Missing entity — skip gracefully
 
-      affected.add(entry.entityId);
-
       const machine = machines[entity.type];
       if (!machine) continue; // No machine for this entity type
+
+      affected.add(entry.entityId);
 
       const evalContext = config.contextEnricher
         ? config.contextEnricher(context, (id) => overlay.get(id)?.status)
@@ -217,7 +216,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
 
       // Report new manual transitions (deduplicate across re-evaluations)
       for (const mt of manualTransitions) {
-        const mtKey = `${entity.id}:${mt.status}`;
+        const mtKey = `${entity.id}:${entity.status}:${mt.status}`;
         if (reportedManualTransitions.has(mtKey)) continue;
         reportedManualTransitions.add(mtKey);
         availableManualTransitions.push({

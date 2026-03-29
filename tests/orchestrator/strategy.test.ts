@@ -338,6 +338,86 @@ describe('propagation strategy', () => {
     expect(result.partialTrace.cause).toBe('raw strategy error');
   });
 
+  it('strategy can filter based on change.from / change.to', () => {
+    // Only propagate when source transitions TO 'ACTIVE' (not other statuses)
+    const onlyOnActive: PropagationStrategy = (change) => change.to === 'ACTIVE';
+
+    const orchestrator = buildOrchestrator({
+      machines,
+      relations,
+      propagation: onlyOnActive,
+    });
+
+    // A -> ACTIVE should propagate (to === 'ACTIVE')
+    const entities1 = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'conducts', sourceId: 'a1', targetId: 'b1' }];
+
+    const result1 = orchestrator.simulate(entities1, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+    expect(result1.ok).toBe(true);
+    if (!result1.ok) return;
+    expect(result1.trace.steps).toHaveLength(1);
+    expect(result1.trace.steps[0].entityId).toBe('b1');
+
+    // A -> PAUSED should NOT propagate (to === 'PAUSED', not 'ACTIVE')
+    const pauseMachines = {
+      typeA: { rules: [] },
+      typeB: {
+        rules: [{ from: 'IDLE', to: 'PAUSED', conditions: [{ fn: 'always_met', args: {} }] }],
+      },
+    };
+    const orchestrator2 = buildOrchestrator({
+      machines: pauseMachines,
+      relations,
+      propagation: onlyOnActive,
+    });
+
+    const result2 = orchestrator2.simulate(entities1, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'PAUSED',
+    });
+    expect(result2.ok).toBe(true);
+    if (!result2.ok) return;
+    // Strategy blocks propagation because trigger.to is 'PAUSED'
+    expect(result2.trace.steps).toHaveLength(0);
+  });
+
+  it('strategy throwing during initial seeding returns cascade_error', () => {
+    const throwAlways: PropagationStrategy = () => {
+      throw new Error('seeding kaboom');
+    };
+
+    const orchestrator = buildOrchestrator({
+      machines,
+      relations,
+      propagation: throwAlways,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'conducts', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error !== 'cascade_error') return;
+    expect(result.partialTrace.error).toBe('seeding kaboom');
+    expect(result.partialTrace.cause).toBeInstanceOf(Error);
+    expect(result.partialTrace.steps).toHaveLength(0);
+  });
+
   it('matchedIds bypass strategy — targets evaluated even when strategy blocks', () => {
     // Strategy allows A→B propagation but blocks B→C
     const blockFromB: PropagationStrategy = (change) => change.entityType !== 'typeB';

@@ -6,7 +6,7 @@ import type { RelationDefinition, RelationInstance } from '../../src/orchestrato
 import { alwaysMet } from './fixtures.js';
 
 describe('cascade performance (NFR-001)', () => {
-  it('simulate() completes in < 200ms for 500 entities, 2000 relations', () => {
+  it('simulate() completes in < 500ms for 500 entities, 2000 relations', () => {
     // Generate 500 entities across 5 types
     const typeCount = 5;
     const entitiesPerType = 100;

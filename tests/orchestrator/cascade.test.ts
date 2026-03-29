@@ -407,11 +407,14 @@ describe('cascade behavior', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // B is re-evaluated in multiple rounds, but MANUAL_TARGET should appear only once
+    // B oscillates between S1 and S2. Manual transitions from distinct `from` statuses
+    // are reported separately (dedup key includes from status).
     const manualForB = result.trace.availableManualTransitions.filter(
       (mt) => mt.entityId === 'b1' && mt.to === 'MANUAL_TARGET',
     );
-    expect(manualForB).toHaveLength(1);
+    expect(manualForB).toHaveLength(2);
+    const froms = manualForB.map((mt) => mt.from).sort();
+    expect(froms).toEqual(['S1', 'S2']);
   });
 
   it('application order correctness — BFS order', () => {

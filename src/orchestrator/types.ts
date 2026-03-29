@@ -62,7 +62,7 @@ export interface CascadeTrace {
   unresolved: UnresolvedEntity[];
   /** Manual transitions that became valid during cascade */
   availableManualTransitions: AvailableManualTransition[];
-  /** All entity IDs that were re-evaluated (superset of steps + unresolved) */
+  /** All entity IDs that were evaluated by the engine (superset of steps + unresolved; excludes entities skipped due to missing machine) */
   affected: string[];
   /** Entity ID -> final status (overlay result) */
   finalStates: ReadonlyMap<string, string>;
