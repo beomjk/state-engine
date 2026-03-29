@@ -256,7 +256,7 @@ export function extractManualTransitions(
 
 /**
  * Extract machines config from a schema for use with createOrchestrator().
- * Keys are entity definition names (matching Entity.type at runtime).
+ * Keys are schema record keys (matching Entity.type at runtime).
  */
 export function extractMachines(
   schema: SchemaDefinition<readonly string[]>,
@@ -265,8 +265,8 @@ export function extractMachines(
     string,
     { rules: TransitionRule[]; manualTransitions: ManualTransition[] }
   > = {};
-  for (const [, entity] of Object.entries(schema.entities)) {
-    result[entity.name] = {
+  for (const [key, entity] of Object.entries(schema.entities)) {
+    result[key] = {
       rules: extractRules(entity),
       manualTransitions: extractManualTransitions(entity),
     };

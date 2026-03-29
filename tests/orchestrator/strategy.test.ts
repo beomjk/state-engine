@@ -7,7 +7,7 @@ import type {
   PropagationStrategy,
   StateChange,
 } from '../../src/orchestrator/types.js';
-import { buildEntityMap, makeEntity, alwaysMet } from './fixtures.js';
+import { buildEntityMap, makeEntity, alwaysMet, returnsIds } from './fixtures.js';
 
 function buildOrchestrator(opts: {
   machines: Parameters<typeof createOrchestrator>[0]['machines'];
@@ -241,5 +241,58 @@ describe('propagation strategy', () => {
     expect(result.trace.steps).toHaveLength(0);
     expect(result.trace.finalStates.get('b1')).toBe('IDLE');
     expect(result.trace.finalStates.get('c1')).toBe('IDLE');
+  });
+
+  it('matchedIds bypass strategy — targets evaluated even when strategy blocks', () => {
+    // Strategy allows A→B propagation but blocks B→C
+    const blockFromB: PropagationStrategy = (change) => change.entityType !== 'typeB';
+
+    const engine = createEngine<unknown>({
+      presets: { always_met: alwaysMet, returns_ids: returnsIds },
+    });
+    const orchestrator = createOrchestrator<unknown>({
+      engine,
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'returns_ids', args: { ids: ['c1'] } }] },
+          ],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      propagation: blockFromB,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // B transitions via relation (strategy allows A→B)
+    expect(result.trace.steps.map((s) => s.entityId)).toContain('b1');
+    // C transitions via matchedIds bypass (strategy would block B→C, but matchedIds overrides)
+    expect(result.trace.steps.map((s) => s.entityId)).toContain('c1');
+    expect(result.trace.finalStates.get('c1')).toBe('ACTIVE');
   });
 });

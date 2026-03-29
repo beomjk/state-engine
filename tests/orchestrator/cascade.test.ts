@@ -1240,4 +1240,43 @@ describe('contextEnricher', () => {
     // b1 evaluated in round 1, c1 in round 2 = 2 calls
     expect(callCount).toBe(2);
   });
+
+  it('enricher throw — cascade_error with partialTrace', () => {
+    const engine = createEngine<unknown>({
+      presets: { always_met: alwaysMet },
+    });
+    const orchestrator = createOrchestrator<unknown>({
+      engine,
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      contextEnricher: () => {
+        throw new Error('Enricher failed');
+      },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error !== 'cascade_error') return;
+    expect(result.partialTrace.converged).toBe(false);
+    expect(result.partialTrace.error).toBe('Enricher failed');
+    expect(result.partialTrace.cause).toBeInstanceOf(Error);
+    expect((result.partialTrace.cause as Error).message).toBe('Enricher failed');
+  });
 });

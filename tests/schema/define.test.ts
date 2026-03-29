@@ -154,13 +154,13 @@ describe('createDefiner / defineSchema', () => {
 
     const machines = extractMachines(schema);
 
-    expect(Object.keys(machines)).toEqual(['TypeA', 'TypeB']);
-    expect(machines['TypeA'].rules).toHaveLength(1);
-    expect(machines['TypeA'].rules[0].from).toBe('IDLE');
-    expect(machines['TypeA'].rules[0].to).toBe('ACTIVE');
-    expect(machines['TypeA'].manualTransitions).toEqual([{ from: 'ACTIVE', to: 'IDLE' }]);
-    expect(machines['TypeB'].rules).toEqual([]);
-    expect(machines['TypeB'].manualTransitions).toEqual([]);
+    expect(Object.keys(machines)).toEqual(['a', 'b']);
+    expect(machines['a'].rules).toHaveLength(1);
+    expect(machines['a'].rules[0].from).toBe('IDLE');
+    expect(machines['a'].rules[0].to).toBe('ACTIVE');
+    expect(machines['a'].manualTransitions).toEqual([{ from: 'ACTIVE', to: 'IDLE' }]);
+    expect(machines['b'].rules).toEqual([]);
+    expect(machines['b'].manualTransitions).toEqual([]);
   });
 
   it('legacy defineEntity still works (deprecated)', () => {
