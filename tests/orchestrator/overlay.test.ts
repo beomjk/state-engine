@@ -104,4 +104,36 @@ describe('StateOverlay', () => {
       expect(base.has('e3')).toBe(false);
     });
   });
+
+  describe('mutation resilience', () => {
+    it('snapshot returns independent Map — mutations do not propagate back', () => {
+      const { overlay } = createOverlay();
+      overlay.set('e1', { ...e1, status: 'TESTING' });
+      const snap = overlay.snapshot();
+
+      // Mutate snapshot (cast away ReadonlyMap to test runtime safety)
+      (snap as Map<string, string>).set('e1', 'HACKED');
+
+      // Overlay still returns the correct value
+      expect(overlay.get('e1')?.status).toBe('TESTING');
+      // A second snapshot is also unaffected
+      const snap2 = overlay.snapshot();
+      expect(snap2.get('e1')).toBe('TESTING');
+    });
+
+    it('base entity map unchanged after simulate/execute', () => {
+      const { overlay, base } = createOverlay();
+      const baseBefore = new Map(base);
+
+      overlay.set('e1', { ...e1, status: 'ACTIVE' });
+      overlay.set('e2', { ...e2, status: 'RUNNING' });
+      overlay.snapshot();
+
+      // Compare base to snapshot taken before overlay operations
+      for (const [id, entity] of baseBefore) {
+        expect(base.get(id)).toBe(entity);
+      }
+      expect(base.size).toBe(baseBefore.size);
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import type { Entity, TransitionRule, PresetFn } from '../../src/engine/types.js';
 import { UnknownPresetError } from '../../src/engine/types.js';
@@ -129,5 +129,60 @@ describe('engine.evaluate', () => {
 
     expect(() => engine.evaluate(entity, {}, rule)).toThrow(UnknownPresetError);
     expect(() => engine.evaluate(entity, {}, rule)).toThrow(/nonexistent/);
+  });
+
+  it('UnknownPresetError includes all registered names and presetName', () => {
+    const engine = createEngine({
+      presets: { alpha: alwaysMet, beta: alwaysMet, gamma: alwaysMet },
+    });
+    const rule: TransitionRule = {
+      from: 'PROPOSED',
+      to: 'TESTING',
+      conditions: [{ fn: 'missing', args: {} }],
+    };
+
+    try {
+      engine.evaluate(entity, {}, rule);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnknownPresetError);
+      const upe = err as InstanceType<typeof UnknownPresetError>;
+      expect(upe.presetName).toBe('missing');
+      expect(upe.message).toContain('alpha');
+      expect(upe.message).toContain('beta');
+      expect(upe.message).toContain('gamma');
+    }
+  });
+
+  it('preset that throws Error propagates through evaluate', () => {
+    const throwing: PresetFn<unknown> = () => {
+      throw new Error('boom');
+    };
+    const engine = createEngine({ presets: { throwing } });
+    const rule: TransitionRule = {
+      from: 'PROPOSED',
+      to: 'TESTING',
+      conditions: [{ fn: 'throwing', args: {} }],
+    };
+
+    expect(() => engine.evaluate(entity, {}, rule)).toThrow('boom');
+  });
+
+  it('short-circuits on first failing condition (second preset not called)', () => {
+    const second = vi.fn<PresetFn<unknown>>(() => ({ met: true, matchedIds: [] }));
+    const engine = createEngine({ presets: { fail: neverMet, second } });
+    const rule: TransitionRule = {
+      from: 'PROPOSED',
+      to: 'TESTING',
+      conditions: [
+        { fn: 'fail', args: {} },
+        { fn: 'second', args: {} },
+      ],
+    };
+
+    const result = engine.evaluate(entity, {}, rule);
+
+    expect(result.met).toBe(false);
+    expect(second).not.toHaveBeenCalled();
   });
 });

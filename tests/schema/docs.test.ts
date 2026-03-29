@@ -141,6 +141,57 @@ Footer`;
     expect(result.content).toContain('| PROPOSED |');
     expect(result.content).not.toContain('\nold\n');
   });
+
+  it('skips reversed AUTO markers (end before start)', () => {
+    const schema = makeSchema();
+    const content = `# States
+<!-- /AUTO:statuses -->
+old content here
+<!-- AUTO:statuses -->
+`;
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('handles only start marker present (missing end)', () => {
+    const schema = makeSchema();
+    const content = `# States\n<!-- AUTO:statuses -->\nold content\n`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('handles only end marker present (missing start)', () => {
+    const schema = makeSchema();
+    const content = `# States\nold content\n<!-- /AUTO:statuses -->\n`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(false);
+    expect(result.tablesReplaced).toEqual([]);
+    expect(result.content).toBe(content);
+  });
+
+  it('replaces some tables when only some markers exist', () => {
+    const schema = makeSchema();
+    const content = `<!-- AUTO:statuses -->
+old
+<!-- /AUTO:statuses -->
+No transitions markers here.`;
+
+    const result = updateDocContent(content, schema);
+
+    expect(result.updated).toBe(true);
+    expect(result.tablesReplaced).toEqual(['statuses']);
+    expect(result.tablesReplaced).not.toContain('transitions');
+    expect(result.content).toContain('| PROPOSED |');
+  });
 });
 
 describe('generateMermaid', () => {

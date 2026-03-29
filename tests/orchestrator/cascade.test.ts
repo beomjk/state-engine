@@ -10,6 +10,7 @@ import {
   throwingPreset,
   throwingNonErrorPreset,
   returnsIds,
+  buildChain,
 } from './fixtures.js';
 
 /**
@@ -666,6 +667,53 @@ describe('edge cases', () => {
     if (!result.ok) return;
     // Should complete without error, just skip the missing entity
     expect(result.trace.converged).toBe(true);
+  });
+
+  it('error at mid-cascade preserves partial progress in partialTrace', () => {
+    // Chain A → B → C; B transitions fine, C throws
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeC: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'throw_preset', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      presets: { throw_preset: throwingPreset },
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error !== 'cascade_error') return;
+    // B should have transitioned before C threw
+    expect(result.partialTrace.steps).toHaveLength(1);
+    expect(result.partialTrace.steps[0].entityId).toBe('b1');
+    expect(result.partialTrace.steps[0].to).toBe('ACTIVE');
+    expect(result.partialTrace.error).toBe('Preset evaluation failed');
   });
 });
 
@@ -1380,5 +1428,522 @@ describe('contextEnricher', () => {
     expect(result.partialTrace.error).toBe('Enricher failed');
     expect(result.partialTrace.cause).toBeInstanceOf(Error);
     expect((result.partialTrace.cause as Error).message).toBe('Enricher failed');
+  });
+});
+
+describe('defensive guards', () => {
+  it('all auto-filtered transitions have non-null rule (invariant)', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'ACTIVE', to: 'DONE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+          manualTransitions: [{ from: 'IDLE', to: 'DONE' }],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    for (const step of result.trace.steps) {
+      expect(step.rule).not.toBeNull();
+      expect(step.rule).toHaveProperty('from');
+      expect(step.rule).toHaveProperty('to');
+    }
+  });
+});
+
+describe('self-referential relations', () => {
+  it('entity type relates to itself — chain within same type', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        node: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'parent_child', source: 'node', target: 'node' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('n1', 'node', 'IDLE'),
+      makeEntity('n2', 'node', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'parent_child', sourceId: 'n1', targetId: 'n2' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'n1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.steps).toHaveLength(1);
+    expect(result.trace.steps[0].entityId).toBe('n2');
+    expect(result.trace.finalStates.get('n2')).toBe('ACTIVE');
+  });
+
+  it('self-relation multi-hop: n1 → n2 → n3 cascading correctly', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        node: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'parent_child', source: 'node', target: 'node' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('n1', 'node', 'IDLE'),
+      makeEntity('n2', 'node', 'IDLE'),
+      makeEntity('n3', 'node', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'parent_child', sourceId: 'n1', targetId: 'n2' },
+      { name: 'parent_child', sourceId: 'n2', targetId: 'n3' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'n1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.steps).toHaveLength(2);
+    expect(result.trace.steps[0].entityId).toBe('n2');
+    expect(result.trace.steps[1].entityId).toBe('n3');
+    expect(result.trace.rounds).toBe(2);
+  });
+});
+
+describe('diamond fan-in with conflict', () => {
+  it('diamond convergence where target has conflicting rules', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeD: {
+          rules: [
+            { from: 'IDLE', to: 'X', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'IDLE', to: 'Y', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'a_c', source: 'typeA', target: 'typeC' },
+        { name: 'b_d', source: 'typeB', target: 'typeD' },
+        { name: 'c_d', source: 'typeC', target: 'typeD' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+      makeEntity('d1', 'typeD', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'a_c', sourceId: 'a1', targetId: 'c1' },
+      { name: 'b_d', sourceId: 'b1', targetId: 'd1' },
+      { name: 'c_d', sourceId: 'c1', targetId: 'd1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // B and C should transition
+    expect(result.trace.steps.map((s) => s.entityId)).toContain('b1');
+    expect(result.trace.steps.map((s) => s.entityId)).toContain('c1');
+    // D should be unresolved (conflicting targets X and Y)
+    expect(result.trace.unresolved).toHaveLength(1);
+    expect(result.trace.unresolved[0].entityId).toBe('d1');
+    expect(result.trace.unresolved[0].conflictingTargets).toContain('X');
+    expect(result.trace.unresolved[0].conflictingTargets).toContain('Y');
+    // D should NOT appear in steps
+    expect(result.trace.steps.map((s) => s.entityId)).not.toContain('d1');
+  });
+});
+
+describe('long cascade chains', () => {
+  it('10-hop chain at exact maxCascadeDepth=10 boundary → converged', () => {
+    const chain = buildChain(11); // 11 entities = 10 hops
+    const orchestrator = buildOrchestrator({
+      machines: chain.machines,
+      relations: chain.relations,
+      maxCascadeDepth: 10,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.converged).toBe(true);
+    expect(result.trace.steps).toHaveLength(10);
+    expect(result.trace.finalStates.get('e10')).toBe('ACTIVE');
+  });
+
+  it('11-hop chain exceeds maxCascadeDepth=10 → not converged', () => {
+    const chain = buildChain(12); // 12 entities = 11 hops
+    const orchestrator = buildOrchestrator({
+      machines: chain.machines,
+      relations: chain.relations,
+      maxCascadeDepth: 10,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.converged).toBe(false);
+    // Last entity should NOT have transitioned
+    expect(result.trace.finalStates.get('e11')).toBe('IDLE');
+  });
+
+  it('maxCascadeDepth=1 limits to single hop', () => {
+    const chain = buildChain(4);
+    const orchestrator = buildOrchestrator({
+      machines: chain.machines,
+      relations: chain.relations,
+      maxCascadeDepth: 1,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.steps).toHaveLength(1);
+    expect(result.trace.steps[0].entityId).toBe('e1');
+    expect(result.trace.finalStates.get('e2')).toBe('IDLE');
+  });
+});
+
+describe('mixed forward/reverse relations', () => {
+  it('forward and reverse relations both fire in single cascade', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'c_a', source: 'typeC', target: 'typeA', direction: 'reverse' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'c_a', sourceId: 'c1', targetId: 'a1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const stepIds = result.trace.steps.map((s) => s.entityId);
+    expect(stepIds).toContain('b1');
+    expect(stepIds).toContain('c1');
+  });
+
+  it('mixed directions create cycle → not converged', () => {
+    // Forward: A changes → B re-evaluates (source=typeA, target=typeB, default)
+    // Reverse: B changes → A re-evaluates (source=typeA, target=typeB, reverse:
+    //   when def.target (typeB) matches change type, re-evaluate source (typeA))
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'ACTIVE', to: 'IDLE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'ACTIVE', to: 'IDLE', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+      },
+      relations: [
+        { name: 'a_b_fwd', source: 'typeA', target: 'typeB' },
+        { name: 'b_a_rev', source: 'typeA', target: 'typeB', direction: 'reverse' },
+      ],
+      maxCascadeDepth: 3,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b_fwd', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_a_rev', sourceId: 'a1', targetId: 'b1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.converged).toBe(false);
+  });
+});
+
+describe('wide fan-out', () => {
+  it('single trigger cascades to 10 siblings in round 1', () => {
+    const machines: Record<string, { rules: { from: string; to: string; conditions: { fn: string; args: Record<string, unknown> }[] }[] }> = {
+      typeA: { rules: [] },
+    };
+    const entities = buildEntityMap(makeEntity('a1', 'typeA', 'IDLE'));
+    const relations: RelationDefinition[] = [];
+    const rels: RelationInstance[] = [];
+
+    for (let i = 0; i < 10; i++) {
+      const typeName = `child_${i}`;
+      machines[typeName] = {
+        rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+      };
+      entities.set(`c${i}`, { id: `c${i}`, type: typeName, status: 'IDLE', meta: {} });
+      relations.push({ name: `rel_${i}`, source: 'typeA', target: typeName });
+      rels.push({ name: `rel_${i}`, sourceId: 'a1', targetId: `c${i}` });
+    }
+
+    const orchestrator = buildOrchestrator({ machines, relations });
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.steps).toHaveLength(10);
+    // All in round 1
+    for (const step of result.trace.steps) {
+      expect(step.round).toBe(1);
+    }
+  });
+});
+
+describe('disconnected subgraph', () => {
+  it('trigger entity with no connected relations — no cascade steps', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    // No relation instances connecting a1 to b1
+    const rels: RelationInstance[] = [];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.steps).toHaveLength(0);
+    expect(result.trace.finalStates.get('b1')).toBe('IDLE');
+  });
+});
+
+describe('invariant verification', () => {
+  it('cascade steps in strict BFS order (rounds monotonically non-decreasing)', () => {
+    const chain = buildChain(5); // 4 hops
+    const orchestrator = buildOrchestrator({
+      machines: chain.machines,
+      relations: chain.relations,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    for (let i = 1; i < result.trace.steps.length; i++) {
+      expect(result.trace.steps[i].round).toBeGreaterThanOrEqual(result.trace.steps[i - 1].round);
+    }
+  });
+
+  it('conflict blocks propagation absolutely through 3-hop chain', () => {
+    // A → B(conflict) → C → D; neither C nor D affected
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'X', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'IDLE', to: 'Y', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeD: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+        { name: 'c_d', source: 'typeC', target: 'typeD' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+      makeEntity('d1', 'typeD', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+      { name: 'c_d', sourceId: 'c1', targetId: 'd1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // B is unresolved
+    expect(result.trace.unresolved).toHaveLength(1);
+    expect(result.trace.unresolved[0].entityId).toBe('b1');
+    // C and D should NOT be in steps
+    const stepIds = result.trace.steps.map((s) => s.entityId);
+    expect(stepIds).not.toContain('c1');
+    expect(stepIds).not.toContain('d1');
+    // C and D remain IDLE
+    expect(result.trace.finalStates.get('c1')).toBe('IDLE');
+    expect(result.trace.finalStates.get('d1')).toBe('IDLE');
+  });
+
+  it('changeset.changes[0] is always the trigger', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.execute(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.changeset.changes[0]).toEqual({
+      entityId: 'a1',
+      entityType: 'typeA',
+      from: 'IDLE',
+      to: 'ACTIVE',
+    });
+  });
+
+  it('converged=false is distinct from cascade_error', () => {
+    const chain = buildChain(4);
+    const orchestrator = buildOrchestrator({
+      machines: chain.machines,
+      relations: chain.relations,
+      maxCascadeDepth: 1,
+    });
+
+    const result = orchestrator.simulate(chain.entities, chain.relationInstances, {}, {
+      entityId: 'e0',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.trace.converged).toBe(false);
+    // No error — just depth exceeded
+    expect(result.trace.error).toBeUndefined();
   });
 });

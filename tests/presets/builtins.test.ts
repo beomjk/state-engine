@@ -78,5 +78,20 @@ describe('builtinPresets', () => {
       const result = fe(makeEntity({}), {}, { name: 'missing', value: 'x' });
       expect(result.met).toBe(false);
     });
+
+    it('undefined args.value matches missing field (undefined === undefined)', () => {
+      const result = fe(makeEntity({}), {}, { name: 'missing', value: undefined });
+      expect(result.met).toBe(true);
+    });
+
+    it('null args.value matches null field (null === null)', () => {
+      const result = fe(makeEntity({ x: null }), {}, { name: 'x', value: null });
+      expect(result.met).toBe(true);
+    });
+
+    it('null args.value does NOT match missing field (undefined !== null)', () => {
+      const result = fe(makeEntity({}), {}, { name: 'missing', value: null });
+      expect(result.met).toBe(false);
+    });
   });
 });

@@ -257,6 +257,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
 
         // Guard narrows match.rule to non-null (guaranteed by autoTransitions filter
         // at line 208, but kept for type narrowing and defensive safety).
+        /* v8 ignore next */
         if (!match.rule) continue;
 
         // Apply to overlay

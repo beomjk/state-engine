@@ -297,6 +297,31 @@ describe('relation definitions', () => {
     });
     expect(() => extractRelations(schema)).toThrow(/target.*nonexistent/i);
   });
+
+  it('extractRelations() with explicit empty array returns empty', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: [],
+    });
+    expect(extractRelations(schema)).toEqual([]);
+  });
+
+  it('extractRelations() allows self-referential relation (source === target)', () => {
+    const d = createDefiner([] as const);
+    const entity = d.entity({ name: 'A', statuses: ['X'] as const });
+    const schema = defineSchema({
+      presetNames: [] as const,
+      entities: { a: entity },
+      relations: [{ name: 'parent_child', source: 'a', target: 'a' }],
+    });
+    const extracted = extractRelations(schema);
+    expect(extracted).toHaveLength(1);
+    expect(extracted[0].source).toBe('a');
+    expect(extracted[0].target).toBe('a');
+  });
 });
 
 describe('type-level safety', () => {

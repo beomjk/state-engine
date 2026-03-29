@@ -243,6 +243,101 @@ describe('propagation strategy', () => {
     expect(result.trace.finalStates.get('c1')).toBe('IDLE');
   });
 
+  it('strategy throwing Error in cascade loop stops with cascade_error', () => {
+    // Strategy must throw during cascade (not initial seeding).
+    // Use 3-hop: A→B→C. Strategy passes for A→B seeding, throws on B→C inside loop.
+    let callCount = 0;
+    const throwOnSecond: PropagationStrategy = () => {
+      callCount++;
+      if (callCount > 1) throw new Error('strategy broke');
+      return true;
+    };
+
+    const orchestrator = buildOrchestrator({
+      machines: {
+        ...machines,
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        ...relations,
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      propagation: throwOnSecond,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'conducts', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error !== 'cascade_error') return;
+    expect(result.partialTrace.error).toBe('strategy broke');
+    expect(result.partialTrace.cause).toBeInstanceOf(Error);
+    // B should have transitioned before the error
+    expect(result.partialTrace.steps).toHaveLength(1);
+    expect(result.partialTrace.steps[0].entityId).toBe('b1');
+  });
+
+  it('strategy throwing non-Error in cascade loop stops with string fallback', () => {
+    let callCount = 0;
+    const throwNonError: PropagationStrategy = () => {
+      callCount++;
+      if (callCount > 1) throw 'raw strategy error';
+      return true;
+    };
+
+    const orchestrator = buildOrchestrator({
+      machines: {
+        ...machines,
+        typeC: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        ...relations,
+        { name: 'b_c', source: 'typeB', target: 'typeC' },
+      ],
+      propagation: throwNonError,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+      makeEntity('c1', 'typeC', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'conducts', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_c', sourceId: 'b1', targetId: 'c1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error !== 'cascade_error') return;
+    expect(result.partialTrace.error).toBe('raw strategy error');
+    expect(result.partialTrace.cause).toBe('raw strategy error');
+  });
+
   it('matchedIds bypass strategy — targets evaluated even when strategy blocks', () => {
     // Strategy allows A→B propagation but blocks B→C
     const blockFromB: PropagationStrategy = (change) => change.entityType !== 'typeB';
