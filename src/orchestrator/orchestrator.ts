@@ -255,8 +255,8 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
           to: match.status,
         };
 
-        // Guard narrows match.rule to non-null (guaranteed by autoTransitions filter
-        // at line 208, but kept for type narrowing and defensive safety).
+        // Guard narrows match.rule to non-null (guaranteed by the autoTransitions
+        // filter above, but kept for type narrowing and defensive safety).
         /* v8 ignore next */
         if (!match.rule) continue;
 
@@ -266,7 +266,7 @@ function runCascade<TContext>(config: CascadeConfig<TContext>): CascadeTrace {
         steps.push({
           ...change,
           round: entry.round,
-          triggeredBy: entry.triggeredBy,
+          triggeredBy: [...entry.triggeredBy],
           rule: match.rule,
         });
 
@@ -382,7 +382,7 @@ export function createOrchestrator<TContext>(
 
     const trace = cascade(init, relations, context);
 
-    if (trace.error) return { ok: false, error: 'cascade_error', partialTrace: trace };
+    if (trace.error !== undefined) return { ok: false, error: 'cascade_error', partialTrace: trace };
     return { ok: true, trace };
   }
 
@@ -426,7 +426,8 @@ export function createOrchestrator<TContext>(
 
     const trace = cascade(init, relations, context);
 
-    if (trace.error) return { ok: false, error: 'cascade_error', partialTrace: trace };
+    if (trace.error !== undefined)
+      return { ok: false, error: 'cascade_error', partialTrace: trace };
 
     const changeset: Changeset = {
       changes: [init.triggerChange, ...trace.steps],

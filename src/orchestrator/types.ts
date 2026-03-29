@@ -80,8 +80,8 @@ export interface CascadeTrace {
  * Result of execute(). Wraps a CascadeTrace with application semantics.
  */
 export interface Changeset {
-  /** Ordered: first element is the trigger (StateChange), rest are cascade steps (CascadeStep extends StateChange) */
-  changes: StateChange[];
+  /** Ordered: first element is the trigger (StateChange), rest are cascade steps */
+  changes: [StateChange, ...CascadeStep[]];
   /** Full cascade trace for auditability */
   trace: CascadeTrace;
   /** Shortcut to trace.unresolved */

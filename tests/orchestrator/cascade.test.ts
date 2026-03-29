@@ -1987,6 +1987,44 @@ describe('propagateAll direct contract', () => {
   });
 });
 
+describe('multiple relations between same entity types', () => {
+  it('two different relations produce a single downstream evaluation (deduped)', () => {
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: { rules: [] },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+      },
+      relations: [
+        { name: 'tests', source: 'typeA', target: 'typeB' },
+        { name: 'funds', source: 'typeA', target: 'typeB' },
+      ],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'tests', sourceId: 'a1', targetId: 'b1' },
+      { name: 'funds', sourceId: 'a1', targetId: 'b1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // b1 should be evaluated once (deduped by targetSet), not twice
+    expect(result.trace.steps).toHaveLength(1);
+    expect(result.trace.steps[0].entityId).toBe('b1');
+    expect(result.trace.steps[0].to).toBe('ACTIVE');
+  });
+});
+
 describe('partial fan-out', () => {
   it('only siblings meeting conditions transition; others stay unchanged', () => {
     const orchestrator = buildOrchestrator({

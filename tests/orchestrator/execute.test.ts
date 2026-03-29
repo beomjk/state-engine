@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine } from '../../src/engine/engine.js';
 import { createOrchestrator } from '../../src/orchestrator/orchestrator.js';
+import type { Entity, PresetResult } from '../../src/engine/types.js';
 import type { RelationDefinition, RelationInstance } from '../../src/orchestrator/types.js';
 import { buildEntityMap, makeEntity, fieldEquals, alwaysMet, throwingPreset } from './fixtures.js';
 
@@ -137,11 +138,17 @@ describe('execute()', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const trace = result.changeset.trace;
-    expect(trace.trigger).toBeDefined();
-    expect(trace.steps).toBeDefined();
-    expect(trace.unresolved).toBeDefined();
-    expect(trace.finalStates).toBeDefined();
+    expect(trace.trigger).toEqual({
+      entityId: 'a1',
+      entityType: 'typeA',
+      from: 'IDLE',
+      to: 'ACTIVE',
+    });
+    expect(trace.steps).toHaveLength(0);
+    expect(trace.unresolved).toHaveLength(0);
+    expect(trace.finalStates.get('a1')).toBe('ACTIVE');
     expect(trace.converged).toBe(true);
+    expect(trace.rounds).toBe(0);
   });
 
   it('changeset.unresolved is shortcut to trace.unresolved', () => {
@@ -377,6 +384,101 @@ describe('execute()', () => {
     if (result.error === 'validation_failed') {
       expect(result.reason).toContain('No machine found');
       expect(result.reason).toContain('typeA');
+    }
+  });
+
+  it('execute() validates against base context, cascade uses enriched context', () => {
+    // A preset that requires context.threshold to be low to pass
+    const thresholdPreset = (
+      _entity: Entity,
+      context: unknown,
+      _args: Record<string, unknown>,
+    ): PresetResult => ({
+      met: (context as { threshold: number }).threshold < 10,
+      matchedIds: [],
+    });
+
+    const engine = createEngine<{ threshold: number }>({
+      presets: { always_met: alwaysMet, threshold_check: thresholdPreset },
+    });
+
+    const orchestrator = createOrchestrator<{ threshold: number }>({
+      engine,
+      machines: {
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'threshold_check', args: {} }] },
+          ],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      // Enricher sets threshold to 100 (blocks threshold_check)
+      contextEnricher: (base, _getStatus) => ({ ...base, threshold: 100 }),
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    // Base context passes threshold_check (threshold=5 < 10)
+    // But enriched context blocks it (threshold=100 >= 10)
+    const result = orchestrator.execute(entities, rels, { threshold: 5 }, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    // Trigger validation uses base context (threshold=5) → passes
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // Cascade uses enriched context (threshold=100) → B does NOT transition
+    expect(result.changeset.changes).toHaveLength(1); // trigger only, no cascade step
+    expect(result.changeset.trace.steps).toHaveLength(0);
+  });
+
+  it('cascade error with empty error message still returns ok: false', () => {
+    const emptyErrorPreset = (): PresetResult => {
+      throw new Error('');
+    };
+
+    const engine = createEngine<unknown>({
+      presets: { always_met: alwaysMet, empty_error: emptyErrorPreset },
+    });
+    const orchestrator = createOrchestrator<unknown>({
+      engine,
+      machines: {
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'empty_error', args: {} }] }],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    const result = orchestrator.execute(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe('cascade_error');
+    if (result.error === 'cascade_error') {
+      expect(result.partialTrace.error).toBe('');
+      expect(result.partialTrace.converged).toBe(false);
     }
   });
 });

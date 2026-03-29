@@ -40,9 +40,18 @@ import {
 // Entry point: @beomjk/state-engine/orchestrator
 import { createOrchestrator, propagateAll, StateOverlay } from '../src/orchestrator/index.js';
 import type {
+  AvailableManualTransition as _AvailableManualTransition,
+  CascadeStep as _CascadeStep,
   CascadeTrace as _CascadeTrace,
-  SimulationResult as _SimulationResult,
+  Changeset as _Changeset,
+  ContextEnricher as _ContextEnricher,
+  ExecutionResult as _ExecutionResult,
   Orchestrator as _Orchestrator,
+  OrchestratorConfig as _OrchestratorConfig,
+  PropagationStrategy as _PropagationStrategy,
+  SimulationResult as _SimulationResult,
+  StateChange as _StateChange,
+  UnresolvedEntity as _UnresolvedEntity,
 } from '../src/orchestrator/index.js';
 
 // Entry point: @beomjk/state-engine/presets
