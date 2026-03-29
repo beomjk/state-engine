@@ -441,6 +441,62 @@ describe('execute()', () => {
     expect(result.changeset.trace.steps).toHaveLength(0);
   });
 
+  it('contextEnricher enables cascade that base context would block', () => {
+    // Inverse of the test above: base context blocks, enricher enables.
+    const thresholdPreset = (
+      _entity: Entity,
+      context: unknown,
+      _args: Record<string, unknown>,
+    ): PresetResult => ({
+      met: (context as { threshold: number }).threshold < 10,
+      matchedIds: [],
+    });
+
+    const engine = createEngine<{ threshold: number }>({
+      presets: { always_met: alwaysMet, threshold_check: thresholdPreset },
+    });
+
+    const orchestrator = createOrchestrator<{ threshold: number }>({
+      engine,
+      machines: {
+        typeA: {
+          rules: [{ from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'always_met', args: {} }] }],
+        },
+        typeB: {
+          rules: [
+            { from: 'IDLE', to: 'ACTIVE', conditions: [{ fn: 'threshold_check', args: {} }] },
+          ],
+        },
+      },
+      relations: [{ name: 'a_b', source: 'typeA', target: 'typeB' }],
+      // Enricher lowers threshold to 1 (enables threshold_check)
+      contextEnricher: (base, _getStatus) => ({ ...base, threshold: 1 }),
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'IDLE'),
+      makeEntity('b1', 'typeB', 'IDLE'),
+    );
+    const rels: RelationInstance[] = [{ name: 'a_b', sourceId: 'a1', targetId: 'b1' }];
+
+    // Base context blocks threshold_check (threshold=100 >= 10)
+    // But enriched context enables it (threshold=1 < 10)
+    const result = orchestrator.execute(entities, rels, { threshold: 100 }, {
+      entityId: 'a1',
+      targetStatus: 'ACTIVE',
+    });
+
+    // Trigger validation uses base context but A's rule is always_met → passes
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // Cascade uses enriched context (threshold=1) → B transitions
+    expect(result.changeset.changes).toHaveLength(2); // trigger + B's cascade step
+    expect(result.changeset.trace.steps).toHaveLength(1);
+    expect(result.changeset.trace.steps[0].entityId).toBe('b1');
+    expect(result.changeset.trace.steps[0].to).toBe('ACTIVE');
+  });
+
   it('cascade error with empty error message still returns ok: false', () => {
     const emptyErrorPreset = (): PresetResult => {
       throw new Error('');

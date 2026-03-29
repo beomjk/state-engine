@@ -417,6 +417,64 @@ describe('cascade behavior', () => {
     expect(froms).toEqual(['S1', 'S2']);
   });
 
+  it('manual transition dedup same-key when entity returns to same status', () => {
+    // Same A <-> B cycle, but with higher maxCascadeDepth so B revisits S1.
+    // Round 1: B at S1 → manual key b1:S1:MANUAL_TARGET recorded
+    // Round 3: B at S2 → manual key b1:S2:MANUAL_TARGET recorded
+    // Round 5: B at S1 again → same-key dedup should prevent duplicate
+    const orchestrator = buildOrchestrator({
+      machines: {
+        typeA: {
+          rules: [
+            { from: 'S1', to: 'S2', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'S2', to: 'S1', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+        },
+        typeB: {
+          rules: [
+            { from: 'S1', to: 'S2', conditions: [{ fn: 'always_met', args: {} }] },
+            { from: 'S2', to: 'S1', conditions: [{ fn: 'always_met', args: {} }] },
+          ],
+          manualTransitions: [{ from: 'ANY', to: 'MANUAL_TARGET' }],
+        },
+      },
+      relations: [
+        { name: 'a_b', source: 'typeA', target: 'typeB' },
+        { name: 'b_a', source: 'typeB', target: 'typeA' },
+      ],
+      maxCascadeDepth: 6,
+    });
+
+    const entities = buildEntityMap(
+      makeEntity('a1', 'typeA', 'S1'),
+      makeEntity('b1', 'typeB', 'S1'),
+    );
+    const rels: RelationInstance[] = [
+      { name: 'a_b', sourceId: 'a1', targetId: 'b1' },
+      { name: 'b_a', sourceId: 'b1', targetId: 'a1' },
+    ];
+
+    const result = orchestrator.simulate(entities, rels, {}, {
+      entityId: 'a1',
+      targetStatus: 'S2',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // B revisits S1 at round 5, but dedup prevents duplicate manual transitions.
+    // Still only 2 unique from-statuses: S1 and S2.
+    const manualForB = result.trace.availableManualTransitions.filter(
+      (mt) => mt.entityId === 'b1' && mt.to === 'MANUAL_TARGET',
+    );
+    expect(manualForB).toHaveLength(2);
+    expect(manualForB.map((mt) => mt.from).sort()).toEqual(['S1', 'S2']);
+
+    // Confirm B was indeed evaluated more than 2 times (at least round 1, 3, 5)
+    const bSteps = result.trace.steps.filter((s) => s.entityId === 'b1');
+    expect(bSteps.length).toBeGreaterThanOrEqual(3);
+  });
+
   it('application order correctness — BFS order', () => {
     // A -> B and A -> C, both at round 1
     const orchestrator = buildOrchestrator({
